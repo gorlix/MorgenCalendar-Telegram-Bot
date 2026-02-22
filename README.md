@@ -42,3 +42,6 @@ Once authenticated:
 Have fun and stay organized!
 ## Architecture
 The application uses a modular architecture where `main.py` acts as the central entrypoint, while specific functionality is isolated within the `handlers/` and `tasks/` packages.
+
+## Architecture
+The application uses a modular architecture where `main.py` acts as the central entrypoint, while specific functionality is isolated within the `handlers/` and `tasks/` packages.
