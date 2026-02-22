@@ -1,0 +1,6 @@
+.env
+morgen_bot.db
+data/
+backups/
+__pycache__/
+*.pyc
