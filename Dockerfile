@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
 
 # Copy application files
-COPY *.py ./
+COPY . .
 
 # Build arguments and environment variables
 ARG APP_VERSION=dev
@@ -23,7 +23,7 @@ ENV DB_PATH=/app/data/morgen_bot.db
 
 # Healthcheck to verify the bot process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD ps -ef | grep "[p]ython bot.py" || exit 1
+    CMD ps -ef | grep "[p]ython main.py" || exit 1
 
 # Run the application
-CMD ["python", "bot.py"]
+CMD ["python", "main.py"]
