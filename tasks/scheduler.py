@@ -31,17 +31,8 @@ async def send_daily_summaries(context: ContextTypes.DEFAULT_TYPE) -> None:
         uid = u["telegram_user_id"]
         
         try:
-            primary_cal = await morgen_client.get_primary_calendar(api_key)
-            if not primary_cal:
-                continue
-
-            calendar_id = primary_cal["id"]
-            account_id = primary_cal["accountId"]
-
-            events = await morgen_client.list_events(
+            events = await morgen_client.get_all_events(
                 api_key=api_key,
-                account_id=account_id,
-                calendar_id=calendar_id,
                 start_datetime=start_str,
                 end_datetime=end_str
             )

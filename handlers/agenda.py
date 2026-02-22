@@ -60,19 +60,8 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.edit_message_text(f"⏳ Fetching agenda for **{day_label}**...", parse_mode=ParseMode.MARKDOWN)
 
     try:
-        # Fetch primary calendar explicitly
-        primary_cal = await morgen_client.get_primary_calendar(api_key)
-        if not primary_cal:
-            await query.edit_message_text("No writable calendars found on your account.")
-            return
-
-        calendar_id = primary_cal["id"]
-        account_id = primary_cal["accountId"]
-
-        events = await morgen_client.list_events(
+        events = await morgen_client.get_all_events(
             api_key=api_key,
-            account_id=account_id,
-            calendar_id=calendar_id,
             start_datetime=start_str,
             end_datetime=end_str
         )

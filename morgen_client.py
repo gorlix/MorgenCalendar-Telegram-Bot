@@ -1,5 +1,6 @@
 import logging
 import httpx
+import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -125,9 +126,9 @@ class MorgenClient:
         calendar_ids: List[str],
         start_datetime: str,
         end_datetime: str
-    ) -> List[Dict[str, Any]]:
+    ) -> httpx.Response:
         """
-        Retrieve events for a specified time window.
+        Retrieve events for a specified time window from multiple calendars.
 
         Args:
             api_key (str): The user's Morgen API key.
@@ -137,24 +138,95 @@ class MorgenClient:
             end_datetime (str): Datetime string with timezone (e.g. "2023-03-02T00:00:00Z").
 
         Returns:
-            List[Dict[str, Any]]: A list of event dictionary objects.
+            httpx.Response: The raw httpx response object so caller can read headers.
         """
         url = f"{self.BASE_URL}/events/list"
-        cal_ids_str = ",".join(calendar_ids)
-        params = {
-            "accountId": account_id,
-            "calendarIds": cal_ids_str,
-            "start": start_datetime,
-            "end": end_datetime
-        }
+        
+        # Use a list of tuples to pass multiple identical parameters to httpx correctly
+        params = [
+            ("accountId", account_id),
+            ("start", start_datetime),
+            ("end", end_datetime)
+        ]
+        for cid in calendar_ids:
+            params.append(("calendarIds", cid))
+
         response = await self.client.get(
             url,
             headers=self._auth_headers(api_key),
             params=params
         )
         response.raise_for_status()
-        data = response.json()
-        return data.get("data", {}).get("events", [])
+        return response
+
+    async def get_all_events(self, api_key: str, start_datetime: str, end_datetime: str) -> List[Dict[str, Any]]:
+        """
+        Fetch events in batches from all available user calendars to avoid rate limits
+        and URL length constraints.
+
+        Args:
+            api_key (str): The user's Morgen API key.
+            start_datetime (str): Datetime string with timezone (e.g. "2023-03-01T00:00:00Z").
+            end_datetime (str): Datetime string with timezone (e.g. "2023-03-02T00:00:00Z").
+
+        Returns:
+            List[Dict[str, Any]]: A flattened, sorted list of all events from all accessible calendars.
+        """
+        try:
+            calendars = await self.list_calendars(api_key)
+            if not calendars:
+                return []
+
+            # Group calendars by accountId, though typically it's just one account
+            account_map = {}
+            for cal in calendars:
+                acc_id = cal.get("accountId")
+                cal_id = cal.get("id")
+                if acc_id and cal_id:
+                    if acc_id not in account_map:
+                        account_map[acc_id] = []
+                    account_map[acc_id].append(cal_id)
+
+            all_events = []
+
+            # Process batches for each account
+            for account_id, cal_ids in account_map.items():
+                # Define batch size
+                batch_size = 5
+                batches = [cal_ids[i:i + batch_size] for i in range(0, len(cal_ids), batch_size)]
+
+                for batch in batches:
+                    try:
+                        response = await self.list_events(
+                            api_key=api_key,
+                            account_id=account_id,
+                            calendar_ids=batch,
+                            start_datetime=start_datetime,
+                            end_datetime=end_datetime
+                        )
+                        
+                        # Log rate limits
+                        rem = response.headers.get("RateLimit-Remaining")
+                        if rem:
+                            logger.info(f"Morgen API Points Remaining: {rem}")
+                            
+                        data = response.json()
+                        events = data.get("data", {}).get("events", [])
+                        all_events.extend(events)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error fetching batch {batch}: {e}")
+                        
+                    # Sleep to respect rate limits between chunks
+                    await asyncio.sleep(0.5)
+
+            # Sort chronologically by start
+            all_events.sort(key=lambda x: x.get("start", ""))
+            return all_events
+
+        except Exception as e:
+            logger.error(f"Error in get_all_events: {e}")
+            return []
 
     async def close(self) -> None:
         """
