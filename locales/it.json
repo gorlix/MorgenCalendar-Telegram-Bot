@@ -55,8 +55,14 @@
     "settings_ask_time": "⏰ Per favore, rispondi con il nuovo orario nel formato `HH:MM` (es., 07:30):",
     "settings_time_success": "✅ Riepilogo aggiornato alle `{time}`!",
     "settings_cancelled": "Azione annullata.",
-    "settings_master_title": "⚙️ **Settings / Impostazioni**\n\nScegli un'opzione qui sotto:",
+    "settings_master_title": "⚙️ **Impostazioni**\n\nScegli un'opzione qui sotto:",
     "settings_btn_daily": "📅 Impostazioni Riepilogo",
     "settings_btn_language": "🌍 Lingua / Language",
-    "settings_btn_back": "🔙 Indietro"
+    "settings_btn_back": "🔙 Indietro",
+    "start_dashboard": "Benvenuto! Cosa ti piacerebbe fare?",
+    "start_btn_guided": "➕ Evento Guidato",
+    "start_btn_quick": "⚡ Evento Rapido",
+    "start_btn_agenda": "📅 Agenda",
+    "start_btn_settings": "⚙️ Impostazioni",
+    "quick_event_guide": "Per creare un evento rapido, usa il comando `/add` seguito dal titolo, data e ora:\n\n`/add Pranzo con Anna 24-02 13:00 1H30M`\n\n- **Data**: `GG-MM`\n- **Orario**: `HH:MM`\n- **Durata**: `1H`, `45M` (opzionale)"
 }

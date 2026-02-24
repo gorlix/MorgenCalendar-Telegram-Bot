@@ -247,7 +247,8 @@ master_settings_conv_handler = ConversationHandler(
     entry_points=[
         CommandHandler("settings", master_settings_start),
         CommandHandler("daily_settings", daily_settings_start),
-        CommandHandler("language", language_settings_start)
+        CommandHandler("language", language_settings_start),
+        CallbackQueryHandler(master_settings_start, pattern="^dashboard_settings$")
     ],
     states={
         MASTER_MENU: [

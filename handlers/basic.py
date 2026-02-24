@@ -24,11 +24,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     welcome_msg = await get_text("start_welcome", user_id)
 
     if user_record and user_record.get("morgen_api_key"):
-        welcome_msg += await get_text("start_already_linked", user_id)
+        msg = await get_text("start_dashboard", user_id)
+        keyboard = [
+            [
+                InlineKeyboardButton(await get_text("start_btn_guided", user_id), callback_data="dashboard_guided"),
+                InlineKeyboardButton(await get_text("start_btn_quick", user_id), callback_data="dashboard_quick")
+            ],
+            [
+                InlineKeyboardButton(await get_text("start_btn_agenda", user_id), callback_data="dashboard_agenda"),
+                InlineKeyboardButton(await get_text("start_btn_settings", user_id), callback_data="dashboard_settings")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     else:
         welcome_msg += await get_text("start_link_prompt", user_id)
+        await update.message.reply_text(welcome_msg, parse_mode=ParseMode.MARKDOWN)
 
-    await update.message.reply_text(welcome_msg, parse_mode=ParseMode.MARKDOWN)
+async def quick_event_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Sends instructional text for creating a quick event.
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    msg = await get_text("quick_event_guide", user_id)
+    
+    # We send a new message instead of replacing the dashboard so the user can see both
+    await query.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

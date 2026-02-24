@@ -57,6 +57,12 @@
     "settings_cancelled": "Action cancelled.",
     "settings_master_title": "⚙️ **Settings**\n\nChoose an option below:",
     "settings_btn_daily": "📅 Daily Agenda Settings",
-    "settings_btn_language": "🌍 Language",
-    "settings_btn_back": "🔙 Back"
+    "settings_btn_language": "🌍 Language / Lingua",
+    "settings_btn_back": "🔙 Back",
+    "start_dashboard": "Welcome! What would you like to do?",
+    "start_btn_guided": "➕ Guided Event",
+    "start_btn_quick": "⚡ Quick Event",
+    "start_btn_agenda": "📅 Agenda",
+    "start_btn_settings": "⚙️ Settings",
+    "quick_event_guide": "To create a quick event, use the `/add` command followed by the title, date, and time:\n\n`/add Lunch with Anna 24-02 13:00 1H30M`\n\n- **Date**: `DD-MM`\n- **Time**: `HH:MM`\n- **Duration**: `1H`, `45M` (optional)"
 }

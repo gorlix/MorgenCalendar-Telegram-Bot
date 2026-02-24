@@ -150,7 +150,13 @@ async def new_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     context.user_data['api_key'] = user_record["morgen_api_key"]
     title_msg = await get_text("new_ask_title", user_id)
-    await update.message.reply_text(title_msg, parse_mode=ParseMode.MARKDOWN)
+    
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(title_msg, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await update.message.reply_text(title_msg, parse_mode=ParseMode.MARKDOWN)
+        
     logger.info("Transitioning to ASK_TITLE")
     return ASK_TITLE
 
@@ -351,7 +357,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 # Explicit dictionary routing map
 conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("new", new_event_start)],
+    entry_points=[
+        CommandHandler("new", new_event_start),
+        CallbackQueryHandler(new_event_start, pattern="^dashboard_guided$")
+    ],
     states={
         ASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_date)],
         ASK_DATE: [

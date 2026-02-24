@@ -5,7 +5,7 @@ import asyncio
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 from database import init_db, get_users_with_agenda
-from handlers.basic import start, handle_api_key, version_cmd
+from handlers.basic import start, handle_api_key, version_cmd, quick_event_callback
 from handlers.events import add_event, conv_handler
 from handlers.agenda import agenda_cmd, agenda_callback
 from handlers.settings import master_settings_conv_handler
@@ -39,6 +39,7 @@ def main() -> None:
     # Basic handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("version", version_cmd))
+    application.add_handler(CallbackQueryHandler(quick_event_callback, pattern="^dashboard_quick$"))
 
     # Event handlers
     application.add_handler(CommandHandler("add", add_event))
@@ -53,6 +54,7 @@ def main() -> None:
     
     # Agenda handlers
     application.add_handler(CommandHandler("agenda", agenda_cmd))
+    application.add_handler(CallbackQueryHandler(agenda_cmd, pattern="^dashboard_agenda$"))
     application.add_handler(CallbackQueryHandler(agenda_callback, pattern="^agenda_"))
 
     # Setup Per-User Daily Summary Jobs
