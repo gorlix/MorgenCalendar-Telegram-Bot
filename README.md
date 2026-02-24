@@ -5,10 +5,13 @@ An asynchronous, robust Telegram Bot that integrates with the Morgen Calendar AP
 ## Features
 
 - **Multi-User Structure**: Uses SQLite down to securely hold users and Morgen API keys.
-- **Natural Interaction**: Uses structured (`/add`) or interactive (`/new`) methods to build events.
+- **Internationalization (i18n)**: Supports multiple languages (English and Italian) via JSON locale files, saving user preferences automatically to the database.
+- **Enhanced Onboarding**: A centralized `/start` dashboard features quick-action buttons for Guided Creation, Quick Add, Agenda, and Settings.
+- **Centralized Settings Menu**: Use `/settings` as a hub to manage both language and daily agenda preferences in one place using inline buttons.
+- **Daily Summaries (Agenda)**: The bot sends an automated daily agenda summary at a user-defined time, managed securely per-user via APScheduler.
+- **Quick Event Creation**: Uses a fast natural syntax (`/add`) or an interactive wizard (`/new`) to build events.
 - **Agenda Fetching**: Use `/agenda` to see what is scheduled for Today or Tomorrow.
-- **Daily Summaries**: Every morning at 07:00 AM, the bot will message you the agenda for the day.
-- **Completely Asynchronous**: Uses `aiosqlite`, `httpx`, and `python-telegram-bot` for robust non-blocking capabilities.
+- **Docker & Tech Stack**: Uses Python 3.11 with `aiosqlite`, `httpx`, and `python-telegram-bot` for robust non-blocking capabilities, all containerized for easy self-hosting.
 
 ## Setup Requirements
 
@@ -34,15 +37,13 @@ An asynchronous, robust Telegram Bot that integrates with the Morgen Calendar AP
 When you start the bot via `/start` on Telegram, it will ask for your **Morgen API Key**. You can find it at:
 https://platform.morgen.so/developers-api
 
-Once authenticated:
-- Use `/add YYYY-MM-DD HH:MM Duration_in_minutes Event Title` for rapid action.
-- Use `/new` to spawn interactive inline keyboards.
-- Use `/agenda` to browse local events.
+Once authenticated, the `/start` command acts as your interactive dashboard. You can also use commands directly:
+- **Quick Event**: Use `/add <Title> <DD-MM> <HH:MM> [Duration]` for rapid action (e.g., `/add Lunch with Anna 24-02 13:00 1H30M`).
+- **Guided Event**: Use `/new` to spawn an interactive step-by-step inline keyboard wizard.
+- **Agenda**: Use `/agenda` to browse local events for today or tomorrow.
+- **Settings**: Use `/settings` to manage your preferred language and configure automated daily summaries.
 
 Have fun and stay organized!
-## Architecture
-The application uses a modular architecture where `main.py` acts as the central entrypoint, while specific functionality is isolated within the `handlers/` and `tasks/` packages.
-
 ## Architecture
 The application uses a modular architecture where `main.py` acts as the central entrypoint, while specific functionality is isolated within the `handlers/` and `tasks/` packages.
 
