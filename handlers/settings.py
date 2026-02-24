@@ -11,7 +11,98 @@ from i18n import get_text
 logger = logging.getLogger(__name__)
 
 # States for the conversation
-ASK_TIME = 1
+MASTER_MENU = 1
+DAILY_MENU = 2
+ASK_TIME = 3
+LANG_MENU = 4
+
+async def send_master_settings(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False):
+    """
+    Renders the Master Settings Menu.
+    """
+    user_id = update.effective_user.id
+    msg = await get_text("settings_master_title", user_id)
+    
+    keyboard = [
+        [InlineKeyboardButton(await get_text("settings_btn_daily", user_id), callback_data="goto_daily")],
+        [InlineKeyboardButton(await get_text("settings_btn_language", user_id), callback_data="goto_lang")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if is_callback:
+        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+
+async def master_settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entry point for /settings"""
+    logger.info("master_settings_start triggered")
+    await send_master_settings(update, context, is_callback=False)
+    return MASTER_MENU
+
+async def master_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle /settings callbacks to submenus"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "goto_daily":
+        await send_settings_dashboard(update, context, is_callback=True)
+        return DAILY_MENU
+    elif query.data == "goto_lang":
+        await send_language_menu(update, context, is_callback=True)
+        return LANG_MENU
+    
+    return MASTER_MENU
+
+async def return_to_master(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Back button handler"""
+    await update.callback_query.answer()
+    await send_master_settings(update, context, is_callback=True)
+    return MASTER_MENU
+
+async def send_language_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False):
+    """
+    Renders Language selection dashboard.
+    """
+    user_id = update.effective_user.id
+    keyboard = [
+        [InlineKeyboardButton(await get_text("language_btn_en", user_id), callback_data="lang_en"),
+         InlineKeyboardButton(await get_text("language_btn_it", user_id), callback_data="lang_it")],
+        [InlineKeyboardButton(await get_text("settings_btn_back", user_id), callback_data="back_master")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    msg = await get_text("language_prompt", user_id)
+    
+    if is_callback:
+        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+
+async def handle_language_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Saves the selected language inside the submenu.
+    """
+    query = update.callback_query
+    await query.answer()
+
+    lang = query.data.split("_")[1]
+    user_id = update.effective_user.id
+    
+    # Save the new language
+    await upsert_user(user_id, language=lang)
+    
+    # Fetch the translated success string in the NEW language and redraw the menu
+    msg = await get_text("language_updated", user_id)
+    
+    keyboard = [
+        [InlineKeyboardButton(await get_text("language_btn_en", user_id), callback_data="lang_en"),
+         InlineKeyboardButton(await get_text("language_btn_it", user_id), callback_data="lang_it")],
+        [InlineKeyboardButton(await get_text("settings_btn_back", user_id), callback_data="back_master")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(f"{msg}\n\n" + await get_text("language_prompt", user_id), reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    return LANG_MENU
 
 async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False):
     """
@@ -37,7 +128,8 @@ async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_
     
     keyboard = [
         [InlineKeyboardButton(toggle_text, callback_data="set_toggle")],
-        [InlineKeyboardButton(time_btn_text, callback_data="set_time")]
+        [InlineKeyboardButton(time_btn_text, callback_data="set_time")],
+        [InlineKeyboardButton(await get_text("settings_btn_back", user_id), callback_data="back_master")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -50,12 +142,16 @@ async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_
     else:
         await update.message.reply_text(dashboard_msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
-async def settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Entry point for /daily_settings"""
-    logger.info("settings_start triggered")
+# Kept as alias for direct command usage
+async def daily_settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entry point alias for /daily_settings"""
     await send_settings_dashboard(update, context, is_callback=False)
-    # Even though we yield the dashboard, we return a fallback state to capture callbacks natively inside the conv handler
-    return ASK_TIME
+    return DAILY_MENU
+
+async def language_settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entry point alias for /language"""
+    await send_language_menu(update, context, is_callback=False)
+    return LANG_MENU
 
 async def handle_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Toggle enabled status"""
@@ -81,7 +177,7 @@ async def handle_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         
     # Redraw dashboard
     await send_settings_dashboard(update, context, is_callback=True)
-    return ASK_TIME
+    return DAILY_MENU
 
 async def ask_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Ask user to type new time"""
@@ -132,7 +228,7 @@ async def process_new_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     # Redraw Dashboard as new message
     await send_settings_dashboard(update, context, is_callback=False)
-    return ASK_TIME
+    return DAILY_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel settings inline interaction"""
@@ -147,13 +243,27 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         
     return ConversationHandler.END
 
-daily_settings_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("daily_settings", settings_start)],
+master_settings_conv_handler = ConversationHandler(
+    entry_points=[
+        CommandHandler("settings", master_settings_start),
+        CommandHandler("daily_settings", daily_settings_start),
+        CommandHandler("language", language_settings_start)
+    ],
     states={
-        ASK_TIME: [
+        MASTER_MENU: [
+            CallbackQueryHandler(master_callback, pattern="^(goto_daily|goto_lang)$")
+        ],
+        DAILY_MENU: [
             CallbackQueryHandler(handle_toggle, pattern="^set_toggle$"),
             CallbackQueryHandler(ask_time, pattern="^set_time$"),
+            CallbackQueryHandler(return_to_master, pattern="^back_master$")
+        ],
+        ASK_TIME: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, process_new_time)
+        ],
+        LANG_MENU: [
+            CallbackQueryHandler(handle_language_selection, pattern="^lang_"),
+            CallbackQueryHandler(return_to_master, pattern="^back_master$")
         ]
     },
     fallbacks=[CommandHandler("cancel", cancel)],

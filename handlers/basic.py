@@ -69,33 +69,3 @@ async def version_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     app_version = os.environ.get("APP_VERSION", "dev")
     msg = await get_text("version", update.effective_user.id, version=app_version)
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
-
-async def language_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Handler for the /language command. Let's the user select en/it.
-    """
-    user_id = update.effective_user.id
-    keyboard = [
-        [InlineKeyboardButton(await get_text("language_btn_en", user_id), callback_data="lang_en"),
-         InlineKeyboardButton(await get_text("language_btn_it", user_id), callback_data="lang_it")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    msg = await get_text("language_prompt", user_id)
-    await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-
-async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Saves the selected language.
-    """
-    query = update.callback_query
-    await query.answer()
-
-    lang = query.data.split("_")[1]
-    user_id = update.effective_user.id
-    
-    # Save the new language
-    await upsert_user(user_id, language=lang)
-    
-    # Fetch the translated success string in the NEW language
-    msg = await get_text("language_updated", user_id)
-    await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN)

@@ -54,5 +54,9 @@
     "settings_dashboard": "⚙️ **Impostazioni Riepilogo Giornaliero**\n\nStato: {status}\nOrario: `{time}`\n\n_Usa i pulsanti qui sotto per personalizzare i tuoi avvisi:_",
     "settings_ask_time": "⏰ Per favore, rispondi con il nuovo orario nel formato `HH:MM` (es., 07:30):",
     "settings_time_success": "✅ Riepilogo aggiornato alle `{time}`!",
-    "settings_cancelled": "Azione annullata."
+    "settings_cancelled": "Azione annullata.",
+    "settings_master_title": "⚙️ **Settings / Impostazioni**\n\nScegli un'opzione qui sotto:",
+    "settings_btn_daily": "📅 Impostazioni Riepilogo",
+    "settings_btn_language": "🌍 Lingua / Language",
+    "settings_btn_back": "🔙 Indietro"
 }

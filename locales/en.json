@@ -54,5 +54,9 @@
     "settings_dashboard": "⚙️ **Daily Summary Settings**\n\nStatus: {status}\nTime: `{time}`\n\n_Use the buttons below to customize your alerts:_",
     "settings_ask_time": "⏰ Please reply with the new time in `HH:MM` format (e.g., 07:30):",
     "settings_time_success": "✅ Schedule updated to `{time}`!",
-    "settings_cancelled": "Action cancelled."
+    "settings_cancelled": "Action cancelled.",
+    "settings_master_title": "⚙️ **Settings**\n\nChoose an option below:",
+    "settings_btn_daily": "📅 Daily Agenda Settings",
+    "settings_btn_language": "🌍 Language",
+    "settings_btn_back": "🔙 Back"
 }
