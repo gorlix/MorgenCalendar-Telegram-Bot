@@ -45,5 +45,14 @@
     "new_creating_event": "⏳ Creating event: **{title}**...",
     "new_success": "✅ Successfully created event: **{title}**\n📅 {date} {time}\n🗂 {calendar}",
     "new_failed": "❌ Failed to create event.",
-    "cancel_msg": "Event creation cancelled."
+    "cancel_msg": "Event creation cancelled.",
+    "settings_btn_enable": "Enable",
+    "settings_btn_disable": "Disable",
+    "settings_btn_time": "Time ({time})",
+    "settings_status_enabled": "Enabled",
+    "settings_status_disabled": "Disabled",
+    "settings_dashboard": "⚙️ **Daily Summary Settings**\n\nStatus: {status}\nTime: `{time}`\n\n_Use the buttons below to customize your alerts:_",
+    "settings_ask_time": "⏰ Please reply with the new time in `HH:MM` format (e.g., 07:30):",
+    "settings_time_success": "✅ Schedule updated to `{time}`!",
+    "settings_cancelled": "Action cancelled."
 }

@@ -45,5 +45,14 @@
     "new_creating_event": "⏳ Creazione dell'evento: **{title}**...",
     "new_success": "✅ Evento creato con successo: **{title}**\n📅 {date} {time}\n🗂 {calendar}",
     "new_failed": "❌ Impossibile creare l'evento.",
-    "cancel_msg": "Creazione dell'evento annullata."
+    "cancel_msg": "Creazione dell'evento annullata.",
+    "settings_btn_enable": "Abilita",
+    "settings_btn_disable": "Disabilita",
+    "settings_btn_time": "Orario ({time})",
+    "settings_status_enabled": "Abilitato",
+    "settings_status_disabled": "Disabilitato",
+    "settings_dashboard": "⚙️ **Impostazioni Riepilogo Giornaliero**\n\nStato: {status}\nOrario: `{time}`\n\n_Usa i pulsanti qui sotto per personalizzare i tuoi avvisi:_",
+    "settings_ask_time": "⏰ Per favore, rispondi con il nuovo orario nel formato `HH:MM` (es., 07:30):",
+    "settings_time_success": "✅ Riepilogo aggiornato alle `{time}`!",
+    "settings_cancelled": "Azione annullata."
 }

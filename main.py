@@ -4,11 +4,12 @@ import asyncio
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
-from database import init_db
+from database import init_db, get_users_with_agenda
 from handlers.basic import start, handle_api_key, version_cmd, language_cmd, language_callback
 from handlers.events import add_event, conv_handler
 from handlers.agenda import agenda_cmd, agenda_callback
-from tasks.scheduler import send_daily_summaries
+from handlers.settings import daily_settings_conv_handler
+from tasks.scheduler import update_user_agenda_job
 
 # Enable logging
 logging.basicConfig(
@@ -52,17 +53,24 @@ def main() -> None:
     # Agenda handlers
     application.add_handler(CommandHandler("agenda", agenda_cmd))
     application.add_handler(CallbackQueryHandler(agenda_callback, pattern="^agenda_"))
+    
+    # Settings handler
+    application.add_handler(daily_settings_conv_handler)
 
-    # Setup Daily Summary Job at 07:00 AM
+    # Setup Per-User Daily Summary Jobs
     job_queue = application.job_queue
     if job_queue:
-        # Note: scheduling using server time as per requirements
-        import datetime as dt
-        t = dt.time(hour=7, minute=0, second=0)
-        job_queue.run_daily(send_daily_summaries, time=t)
-        logger.info("Daily summary scheduled for 07:00 AM server time.")
+        users_with_agendas = asyncio.run(get_users_with_agenda())
+        logger.info(f"Scheduling agenda jobs for {len(users_with_agendas)} opted-in users...")
+        for u in users_with_agendas:
+            update_user_agenda_job(
+                job_queue=job_queue,
+                user_id=u["telegram_user_id"],
+                is_enabled=u["agenda_enabled"],
+                time_str=u["agenda_time"]
+            )
     else:
-        logger.warning("JobQueue is not initialized.")
+        logger.warning("JobQueue is not initialized. Background jobs will not run.")
 
     # Run the bot
     logger.info("Bot is starting...")
