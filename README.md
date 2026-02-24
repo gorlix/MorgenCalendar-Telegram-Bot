@@ -45,3 +45,11 @@ The application uses a modular architecture where `main.py` acts as the central 
 
 ## Architecture
 The application uses a modular architecture where `main.py` acts as the central entrypoint, while specific functionality is isolated within the `handlers/` and `tasks/` packages.
+
+### ⚠️ Important Note on Morgen API Rate Limits
+
+The Morgen API enforces a strict rate limit to ensure system stability: **100 points every 15 minutes**.
+
+Fetching calendar events is an "expensive" operation (costs 10 points per calendar batch). While this bot uses advanced "smart batching" to minimize point usage, users with a large number of connected calendars (e.g., 10+) who spam the `/agenda` command might temporarily deplete their points.
+
+If this happens, the bot is not broken! It will simply notify you to wait a few minutes until the points reset. You can read more about these constraints built into the platform in the official documentation: https://docs.morgen.so/rate-limits
