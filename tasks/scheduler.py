@@ -5,8 +5,9 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from database import get_users_for_daily_summary
-from morgen_client import MorgenClient
+from morgen_client import MorgenClient, RateLimitError
 from formatters import format_daily_summary
+from i18n import get_text
 
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
@@ -37,7 +38,25 @@ async def send_daily_summaries(context: ContextTypes.DEFAULT_TYPE) -> None:
                 end_datetime=end_str
             )
 
-            msg = format_daily_summary(events)
+            msg = format_daily_summary(events, lang=u.get('language', 'en'))
             await context.bot.send_message(chat_id=uid, text=msg, parse_mode=ParseMode.MARKDOWN_V2)
+            
+        except RateLimitError as e:
+            import re
+            match = re.search(r'wait (\d+) seconds', str(e))
+            if match:
+                seconds = int(match.group(1))
+                minutes = seconds // 60
+                secs = seconds % 60
+                if minutes > 0:
+                    time_str = f"{minutes} minutes and {secs} seconds"
+                else:
+                    time_str = f"{secs} seconds"
+            else:
+                time_str = "15 minutes"
+                
+            delay_msg = await get_text("daily_summary_delayed", uid, time_str=time_str)
+            await context.bot.send_message(chat_id=uid, text=delay_msg)
+            
         except Exception as e:
             logger.error(f"Failed to send summary to {uid}: {e}")

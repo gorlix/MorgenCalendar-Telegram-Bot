@@ -1,6 +1,7 @@
 import re
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -15,77 +16,105 @@ from telegram.constants import ParseMode
 
 from database import get_user
 from morgen_client import MorgenClient
+from i18n import get_text
 
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
 
 # Conversation states for /new command
-WAITING_TITLE = 1
-WAITING_DATE = 2
-WAITING_TIME = 3
-WAITING_DURATION = 4
-WAITING_CUSTOM_DATE = 5
-WAITING_CUSTOM_TIME = 6
+ASK_TITLE, ASK_DATE, ASK_TIME, ASK_CALENDAR = range(4)
+
+def get_naive_iso_string(date_str: str, time_str: str) -> str:
+    """
+    Takes 'YYYY-MM-DD' and 'HH:MM', and constructs a naive ISO8601 string
+    (e.g. 2026-02-28T15:00:00) without timezone offsets for Morgen API.
+    """
+    dt_str = f"{date_str} {time_str}"
+    dt_obj_naive = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+    return dt_obj_naive.strftime("%Y-%m-%dT%H:%M:00")
 
 async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handler for the /add command (Structured text creation).
-
-    Expected format: /add <YYYY-MM-DD> <HH:MM> <Duration_in_minutes> <Title>
+    Quick Insert Command (/add)
+    Expected format: /add <Title> <DD-MM> <HH:MM>
     """
     user_id = update.effective_user.id
     user_record = await get_user(user_id)
 
     if not user_record or not user_record.get("morgen_api_key"):
-        await update.message.reply_text("Please set your Morgen API Key using /start first.")
+        msg = await get_text("new_please_link", user_id)
+        await update.message.reply_text(msg)
         return
 
     api_key = user_record["morgen_api_key"]
-    args = context.args
-
-    if len(args) < 4:
-        await update.message.reply_text(
-            "❌ Invalid format.\n\n"
-            "Usage: `/add <YYYY-MM-DD> <HH:MM> <Duration_in_minutes> <Title>`\n"
-            "Example: `/add 2026-03-01 10:00 30 Team Meeting`",
-            parse_mode=ParseMode.MARKDOWN
-        )
+    
+    # We use update.message.text to parse with regex since context.args splits by space 
+    # and the title may contain spaces.
+    text = update.message.text.strip()
+    match = re.match(r'^/add\s+(.+?)\s+(\d{1,2}-\d{1,2})\s+(\d{1,2}:\d{2})(?:\s+([a-zA-Z0-9:]+))?$', text)
+    
+    if not match:
+        msg = await get_text("add_invalid_format", user_id)
+        await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
         return
 
-    date_str, time_str, duration_str = args[0], args[1], args[2]
-    title = " ".join(args[3:])
-
-    # Basic validations
-    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
-        await update.message.reply_text("❌ Invalid date. Use YYYY-MM-DD.")
+    title = match.group(1).strip()
+    date_dd_mm = match.group(2)
+    time_str = match.group(3)
+    optional_arg = match.group(4)
+    
+    duration_iso = "PT1H"  # default
+    
+    if optional_arg:
+        optional_arg = optional_arg.upper()
+        if ":" in optional_arg:
+            try:
+                start_dt = datetime.strptime(time_str, "%H:%M")
+                end_dt = datetime.strptime(optional_arg, "%H:%M")
+                if end_dt < start_dt:
+                    end_dt += timedelta(days=1)
+                
+                diff_sec = int((end_dt - start_dt).total_seconds())
+                h = diff_sec // 3600
+                m = (diff_sec % 3600) // 60
+                
+                dur_parts = ["PT"]
+                if h > 0: dur_parts.append(f"{h}H")
+                if m > 0: dur_parts.append(f"{m}M")
+                
+                if len(dur_parts) > 1:
+                    duration_iso = "".join(dur_parts)
+            except ValueError:
+                pass
+        elif "H" in optional_arg or "M" in optional_arg:
+            duration_iso = f"PT{optional_arg}"
+            
+    logger.info(f"Regex matched! Title: '{title}', Date: '{date_dd_mm}', Time: '{time_str}', Duration ISO: '{duration_iso}'")
+    
+    # Reformat date to YYYY-MM-DD
+    current_year = datetime.now().year
+    day, month = date_dd_mm.split("-")
+    date_str = f"{current_year}-{month.zfill(2)}-{day.zfill(2)}"
+    
+    # Basic time validation
+    try:
+        start_naive_iso = get_naive_iso_string(date_str, time_str)
+        logger.info(f"Constructed start datetime ISO: {start_naive_iso}")
+    except ValueError:
+        msg = await get_text("add_invalid_datetime", user_id)
+        await update.message.reply_text(msg)
         return
-    if not re.match(r"^\d{2}:\d{2}$", time_str):
-        await update.message.reply_text("❌ Invalid time. Use HH:MM.")
-        return
-    if not duration_str.isdigit():
-        await update.message.reply_text("❌ Duration must be a number of minutes.")
-        return
 
-    # Construct datetime string
-    start_datetime_iso = f"{date_str}T{time_str}:00"
-    duration_iso = f"PT{duration_str}M"
-
-    await _process_event_creation(update.message, api_key, title, start_datetime_iso, duration_iso)
-
-
-async def _process_event_creation(
-    message, api_key: str, title: str, start_datetime_iso: str, duration_iso: str
-) -> None:
-    """
-    Helper function to process the event creation logic via Morgen API.
-    """
     primary_cal = await morgen_client.get_primary_calendar(api_key)
     if not primary_cal:
-        await message.reply_text("❌ Could not find a primary writable calendar on your Morgen account.")
+        msg = await get_text("add_no_primary_cal", user_id)
+        await update.message.reply_text(msg)
         return
 
     account_id = primary_cal["accountId"]
     calendar_id = primary_cal["id"]
+    
+    logger.info(f"Primary Calendar selected -> ID: {calendar_id}, Account: {account_id}")
 
     try:
         await morgen_client.create_event(
@@ -93,166 +122,249 @@ async def _process_event_creation(
             account_id=account_id,
             calendar_id=calendar_id,
             title=title,
-            start_datetime_iso=start_datetime_iso,
-            duration_iso=duration_iso
+            start_datetime_iso=start_naive_iso,
+            duration_iso=duration_iso,
+            timezone="Europe/Rome"
         )
-        await message.reply_text(f"✅ Successfully created event: **{title}**", parse_mode=ParseMode.MARKDOWN)
+        msg = await get_text("add_success", user_id, title=title)
+        await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Error creating event: {e}")
-        await message.reply_text("❌ Failed to create event. Please check the logs.")
+        msg = await get_text("add_failed", user_id)
+        await update.message.reply_text(msg)
 
 
-# --- Conversation Handler stuff for /new ---
+# --- Interactive Wizard (/new) ---
 
 async def new_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Step 1: Ask for title"""
+    logger.info("new_event_start triggered")
     user_id = update.effective_user.id
     user_record = await get_user(user_id)
 
     if not user_record or not user_record.get("morgen_api_key"):
-        await update.message.reply_text("Please set your Morgen API Key using /start first.")
+        logger.warning(f"User {user_id} lacks morgen_api_key")
+        msg = await get_text("new_please_link", user_id)
+        await update.message.reply_text(msg)
         return ConversationHandler.END
 
-    await update.message.reply_text("Let's create a new event. What is the **Title**? (Type it below)", parse_mode=ParseMode.MARKDOWN)
-    return WAITING_TITLE
+    context.user_data['api_key'] = user_record["morgen_api_key"]
+    title_msg = await get_text("new_ask_title", user_id)
+    await update.message.reply_text(title_msg, parse_mode=ParseMode.MARKDOWN)
+    logger.info("Transitioning to ASK_TITLE")
+    return ASK_TITLE
 
-
-async def new_event_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['title'] = update.message.text
-    keyboard = [
-        [InlineKeyboardButton("Today", callback_data="date_today"),
-         InlineKeyboardButton("Tomorrow", callback_data="date_tomorrow")],
-        [InlineKeyboardButton("Custom Date", callback_data="date_custom")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Great. Which **Date**?", reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-    return WAITING_DATE
-
-
-async def new_event_date_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "date_today":
-        context.user_data['date'] = datetime.now().strftime("%Y-%m-%d")
-    elif query.data == "date_tomorrow":
-        context.user_data['date'] = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    elif query.data == "date_custom":
-        await query.edit_message_text("Please reply with the date in `YYYY-MM-DD` format:", parse_mode=ParseMode.MARKDOWN)
-        return WAITING_CUSTOM_DATE
-
-    return await ask_time(query, context)
-
-
-async def new_event_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text.strip()
-    if not re.match(r"^\d{4}-\d{2}-\d{2}$", text):
-        await update.message.reply_text("Invalid format. Please use `YYYY-MM-DD`:", parse_mode=ParseMode.MARKDOWN)
-        return WAITING_CUSTOM_DATE
-    context.user_data['date'] = text
-    # we need to simulate a query behavior or just send a message
-    return await ask_time(update, context, is_message=True)
-
-
-async def ask_time(update_obj, context: ContextTypes.DEFAULT_TYPE, is_message: bool = False) -> int:
-    keyboard = [
-        [InlineKeyboardButton("Morning (09:00)", callback_data="time_09:00"),
-         InlineKeyboardButton("Afternoon (14:00)", callback_data="time_14:00")],
-        [InlineKeyboardButton("Evening (18:00)", callback_data="time_18:00"),
-         InlineKeyboardButton("Custom Time", callback_data="time_custom")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    msg = f"Date set to {context.user_data['date']}. What **Time**?"
+async def ask_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Step 2: Save title and ask for date"""
+    title_text = update.message.text.strip()
+    logger.info(f"ask_date triggered. Title received: '{title_text}'")
+    context.user_data['title'] = title_text
     
-    if is_message:
-        await update_obj.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    user_id = update.effective_user.id
+    
+    keyboard = [
+        [InlineKeyboardButton(await get_text("new_btn_today", user_id), callback_data="date_today"),
+         InlineKeyboardButton(await get_text("new_btn_tomorrow", user_id), callback_data="date_tomorrow"),
+         InlineKeyboardButton(await get_text("new_btn_in2days", user_id), callback_data="date_in2days")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    msg = await get_text("new_ask_date", user_id)
+    await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    logger.info("Transitioning to ASK_DATE")
+    return ASK_DATE
+
+async def process_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Process date input (either callback or text)"""
+    now = datetime.now(ZoneInfo("Europe/Rome"))
+    logger.info("process_date triggered")
+    
+    user_id = update.effective_user.id
+    
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        data = query.data
+        logger.info(f"Callback data received: {data}")
+        if data == "date_today":
+            date_str = now.strftime("%Y-%m-%d")
+        elif data == "date_tomorrow":
+            date_str = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+        elif data == "date_in2days":
+            date_str = (now + timedelta(days=2)).strftime("%Y-%m-%d")
+        context.user_data['date'] = date_str
+        reply_func = query.edit_message_text
     else:
-        await update_obj.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        text = update.message.text.strip()
+        logger.info(f"Text data received: {text}")
+        match = re.match(r"^(\d{1,2})-(\d{1,2})$", text)
+        if not match:
+            logger.warning("Invalid date format entered.")
+            msg = await get_text("new_invalid_date", user_id)
+            await update.message.reply_text(msg)
+            return ASK_DATE
+        day, month = match.group(1), match.group(2)
+        context.user_data['date'] = f"{now.year}-{month.zfill(2)}-{day.zfill(2)}"
+        reply_func = update.message.reply_text
+
+    logger.info(f"Date set to: {context.user_data['date']}")
     
-    return WAITING_TIME
-
-
-async def new_event_time_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    if query.data.startswith("time_") and query.data != "time_custom":
-        context.user_data['time'] = query.data.split("_")[1]
-    elif query.data == "time_custom":
-        await query.edit_message_text("Please reply with the time in `HH:MM` format (24h):", parse_mode=ParseMode.MARKDOWN)
-        return WAITING_CUSTOM_TIME
-
-    return await ask_duration(query, context)
-
-
-async def new_event_custom_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text.strip()
-    if not re.match(r"^\d{2}:\d{2}$", text):
-        await update.message.reply_text("Invalid format. Please use `HH:MM`:", parse_mode=ParseMode.MARKDOWN)
-        return WAITING_CUSTOM_TIME
-    context.user_data['time'] = text
-    return await ask_duration(update, context, is_message=True)
-
-
-async def ask_duration(update_obj, context: ContextTypes.DEFAULT_TYPE, is_message: bool = False) -> int:
     keyboard = [
-        [InlineKeyboardButton("15m", callback_data="dur_15"),
-         InlineKeyboardButton("30m", callback_data="dur_30")],
-        [InlineKeyboardButton("1h", callback_data="dur_60")]
+        [InlineKeyboardButton(f"{h:02d}:00", callback_data=f"{h:02d}:00"),
+         InlineKeyboardButton(f"{h:02d}:30", callback_data=f"{h:02d}:30")]
+        for h in range(7, 24)
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    msg = f"Time set to {context.user_data['time']}. What is the **Duration**?"
-
-    if is_message:
-        await update_obj.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-    else:
-        await update_obj.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     
-    return WAITING_DURATION
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    msg = await get_text("new_ask_time", user_id, date=context.user_data['date'])
+    await reply_func(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    logger.info("Transitioning to ASK_TIME")
+    return ASK_TIME
 
+async def process_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Process time input and ask for Calendar"""
+    logger.info("process_time triggered")
+    user_id = update.effective_user.id
+    
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        time_str = query.data
+        logger.info(f"Callback time received: {time_str}")
+        reply_func = query.edit_message_text
+    else:
+        text = update.message.text.strip()
+        logger.info(f"Text time received: {text}")
+        if not re.match(r"^\d{1,2}:\d{2}$", text):
+            logger.warning("Invalid time format entered.")
+            msg = await get_text("new_invalid_time", user_id)
+            await update.message.reply_text(msg)
+            return ASK_TIME
+        time_str = text.zfill(5)
+        reply_func = update.message.reply_text
 
-async def new_event_duration_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['time'] = time_str
+    
+    api_key = context.user_data['api_key']
+    try:
+        logger.info("Fetching calendars...")
+        calendars = await morgen_client.list_calendars(api_key)
+        logger.info(f"Fetched {len(calendars)} calendars")
+    except Exception as e:
+        logger.error(f"Error fetching calendars: {e}")
+        msg = await get_text("new_error_fetching_cals", user_id)
+        await reply_func(msg)
+        return ConversationHandler.END
+
+    keyboard = []
+    for cal in calendars:
+        rights = cal.get("myRights", {})
+        if cal.get("selected") is not False and (rights.get("mayWriteItems") or rights.get("mayWriteAll")):
+            cal_id = cal.get("id")
+            acc_id = cal.get("accountId")
+            name = cal.get("name", "Unknown")
+            
+            if 'calendars' not in context.user_data:
+                context.user_data['calendars'] = []
+            
+            idx = len(context.user_data['calendars'])
+            context.user_data['calendars'].append({
+                "id": cal_id,
+                "accountId": acc_id,
+                "name": name
+            })
+            keyboard.append([InlineKeyboardButton(name, callback_data=f"cal_{idx}")])
+
+    if not keyboard:
+        logger.warning("No writable calendars found")
+        msg = await get_text("new_no_writable_cals", user_id)
+        await reply_func(msg)
+        return ConversationHandler.END
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    msg = await get_text("new_ask_calendar", user_id, time=time_str)
+    await reply_func(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    logger.info("Transitioning to ASK_CALENDAR")
+    return ASK_CALENDAR
+
+async def process_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Final step: Create the event"""
+    logger.info("process_calendar triggered")
+    user_id = update.effective_user.id
+    
     query = update.callback_query
     await query.answer()
-
-    duration_mins = query.data.split("_")[1]
     
-    # We have all info, compile and execute
+    idx = int(query.data.split("_")[1])
+    selected_cal = context.user_data['calendars'][idx]
+    
     title = context.user_data['title']
     date_str = context.user_data['date']
     time_str = context.user_data['time']
+    api_key = context.user_data['api_key']
     
-    start_datetime_iso = f"{date_str}T{time_str}:00"
-    duration_iso = f"PT{duration_mins}M"
-
-    user_id = update.effective_user.id
-    user_record = await get_user(user_id)
-    api_key = user_record["morgen_api_key"]
-
-    await query.edit_message_text(f"⏳ Creating event **{title}**...", parse_mode=ParseMode.MARKDOWN)
-
-    # Note: query.message is roughly equivalent to a message object for this helper function
-    await _process_event_creation(query.message, api_key, title, start_datetime_iso, duration_iso)
+    logger.info(f"Selected calendar index {idx}: {selected_cal.get('name')}")
     
-    # Cleanup
+    try:
+        start_naive_iso = get_naive_iso_string(date_str, time_str)
+        logger.info(f"Parsed naive iso string: {start_naive_iso}")
+    except Exception as e:
+        logger.error(f"Datetime parse error: {e}")
+        msg = await get_text("new_error_datetime", user_id)
+        await query.edit_message_text(msg)
+        return ConversationHandler.END
+
+    progress_msg = await get_text("new_creating_event", user_id, title=title)
+    await query.edit_message_text(progress_msg, parse_mode=ParseMode.MARKDOWN)
+
+    try:
+        logger.info(f"Sending create_event payload for '{title}' to Morgen API...")
+        await morgen_client.create_event(
+            api_key=api_key,
+            account_id=selected_cal["accountId"],
+            calendar_id=selected_cal["id"],
+            title=title,
+            start_datetime_iso=start_naive_iso,
+            duration_iso="PT1H",
+            timezone="Europe/Rome"
+        )
+        logger.info("create_event payload succeeded")
+        success_msg = await get_text("new_success", user_id, title=title, date=date_str, time=time_str, calendar=selected_cal['name'])
+        await query.edit_message_text(success_msg, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.error(f"Error creating event: {e}")
+        failure_msg = await get_text("new_failed", user_id)
+        await query.edit_message_text(failure_msg)
+    
     context.user_data.clear()
+    logger.info("Ending ConversationHandler naturally.")
     return ConversationHandler.END
-
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Event creation cancelled.")
+    logger.info("Conversation cancelled via /cancel block.")
+    user_id = update.effective_user.id
+    msg = await get_text("cancel_msg", user_id)
+    await update.message.reply_text(msg)
     context.user_data.clear()
     return ConversationHandler.END
 
-# Export the ConversationHandler for /new
+# Explicit dictionary routing map
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("new", new_event_start)],
     states={
-        WAITING_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_event_title)],
-        WAITING_DATE: [CallbackQueryHandler(new_event_date_callback, pattern="^date_")],
-        WAITING_CUSTOM_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_event_custom_date)],
-        WAITING_TIME: [CallbackQueryHandler(new_event_time_callback, pattern="^time_")],
-        WAITING_CUSTOM_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_event_custom_time)],
-        WAITING_DURATION: [CallbackQueryHandler(new_event_duration_callback, pattern="^dur_")]
+        ASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_date)],
+        ASK_DATE: [
+            CallbackQueryHandler(process_date, pattern="^date_"),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, process_date)
+        ],
+        ASK_TIME: [
+            CallbackQueryHandler(process_time, pattern=r"^\d{2}:\d{2}$"),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, process_time)
+        ],
+        ASK_CALENDAR: [
+            CallbackQueryHandler(process_calendar, pattern="^cal_")
+        ]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

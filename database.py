@@ -26,11 +26,19 @@ async def init_db() -> None:
                 telegram_user_id INTEGER PRIMARY KEY,
                 morgen_api_key TEXT,
                 timezone TEXT DEFAULT 'UTC',
-                daily_summary_enabled BOOLEAN DEFAULT 0
+                daily_summary_enabled BOOLEAN DEFAULT 0,
+                language TEXT DEFAULT 'en'
             )
             '''
         )
         await db.commit()
+        
+        # Add 'language' column to existing DB if missing
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'en'")
+            await db.commit()
+        except aiosqlite.OperationalError:
+            pass # Column already exists
 
 
 async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
@@ -60,7 +68,8 @@ async def upsert_user(
     telegram_user_id: int,
     morgen_api_key: Optional[str] = None,
     timezone: Optional[str] = None,
-    daily_summary_enabled: Optional[bool] = None
+    daily_summary_enabled: Optional[bool] = None,
+    language: Optional[str] = None
 ) -> None:
     """
     Insert a new user or update an existing user's details.
@@ -70,6 +79,7 @@ async def upsert_user(
         morgen_api_key (Optional[str]): The user's Morgen API key. Defaults to None.
         timezone (Optional[str]): The user's timezone (e.g., 'UTC'). Defaults to None.
         daily_summary_enabled (Optional[bool]): Whether the user wants daily summaries. Defaults to None.
+        language (Optional[str]): The user's preferred language. Defaults to None.
     """
     user = await get_user(telegram_user_id)
 
@@ -78,14 +88,15 @@ async def upsert_user(
             # Insert a new user
             await db.execute(
                 '''
-                INSERT INTO users (telegram_user_id, morgen_api_key, timezone, daily_summary_enabled)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO users (telegram_user_id, morgen_api_key, timezone, daily_summary_enabled, language)
+                VALUES (?, ?, ?, ?, ?)
                 ''',
                 (
                     telegram_user_id,
                     morgen_api_key,
                     timezone or 'UTC',
-                    1 if daily_summary_enabled else 0
+                    1 if daily_summary_enabled else 0,
+                    language or 'en'
                 )
             )
         else:
@@ -102,6 +113,9 @@ async def upsert_user(
             if daily_summary_enabled is not None:
                 query += "daily_summary_enabled = ?, "
                 params.append(1 if daily_summary_enabled else 0)
+            if language is not None:
+                query += "language = ?, "
+                params.append(language)
             
             # Remove trailing comma and space
             query = query.rstrip(', ')

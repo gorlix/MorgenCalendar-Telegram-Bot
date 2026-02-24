@@ -6,6 +6,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+class RateLimitError(Exception):
+    pass
+
 class MorgenClient:
     """
     An asynchronous client for interacting with the Morgen API.
@@ -111,12 +114,20 @@ class MorgenClient:
             "timeZone": timezone,
             "showWithoutTime": False
         }
+        logger.info(f"CREATE EVENT PAYLOAD: {payload}")
+        
         response = await self.client.post(
             url,
             headers=self._auth_headers(api_key),
             json=payload
         )
-        response.raise_for_status()
+        
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"MORGEN API REJECTED REQUEST (400) - Response Body: {e.response.text}")
+            raise
+            
         return response.json()
 
     async def list_events(
@@ -179,9 +190,18 @@ class MorgenClient:
 
             # Group calendars by accountId, though typically it's just one account
             account_map = {}
+            cal_map = {}
             for cal in calendars:
-                acc_id = cal.get("accountId")
+                if cal.get("selected") is False:
+                    continue
+                    
                 cal_id = cal.get("id")
+                if "name" in cal:
+                    cal_map[cal_id] = cal["name"]
+                else:
+                    cal_map[cal_id] = "Unknown Calendar"
+                    
+                acc_id = cal.get("accountId")
                 if acc_id and cal_id:
                     if acc_id not in account_map:
                         account_map[acc_id] = []
@@ -211,9 +231,26 @@ class MorgenClient:
                             logger.info(f"Morgen API Points Remaining: {rem}")
                             
                         data = response.json()
-                        events = data.get("data", {}).get("events", [])
-                        all_events.extend(events)
+                        response_events = data.get("data", {}).get("events", [])
                         
+                        for ev in response_events:
+                            print(f"DEBUG RAW EVENT: {ev}")
+                            title = ev.get("title") or ""
+                            if not title or not title.strip() or title.strip() == "Busy":
+                                continue
+                            ev["calendar_name"] = cal_map.get(ev.get("calendarId"), "Unknown Calendar")
+                            all_events.append(ev)
+                            
+                    except httpx.HTTPStatusError as e:
+                        if e.response.status_code == 429:
+                            reset = e.response.headers.get("RateLimit-Reset") or e.response.headers.get("Retry-After")
+                            try:
+                                reset_seconds = int(reset)
+                            except (TypeError, ValueError):
+                                reset_seconds = 900
+                            raise RateLimitError(f"API Limit Reached. Please wait {reset_seconds} seconds.")
+                        else:
+                            logger.warning(f"Error fetching batch {batch}: {e}")
                     except Exception as e:
                         logger.warning(f"Error fetching batch {batch}: {e}")
                         
@@ -223,7 +260,19 @@ class MorgenClient:
             # Sort chronologically by start
             all_events.sort(key=lambda x: x.get("start", ""))
             return all_events
-
+            
+        except RateLimitError:
+            raise
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                reset = e.response.headers.get("RateLimit-Reset") or e.response.headers.get("Retry-After")
+                try:
+                    reset_seconds = int(reset)
+                except (TypeError, ValueError):
+                    reset_seconds = 900
+                raise RateLimitError(f"API Limit Reached. Please wait {reset_seconds} seconds.")
+            logger.error(f"HTTP error in get_all_events: {e}")
+            return []
         except Exception as e:
             logger.error(f"Error in get_all_events: {e}")
             return []

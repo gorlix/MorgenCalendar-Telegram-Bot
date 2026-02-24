@@ -5,7 +5,7 @@ import asyncio
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 from database import init_db
-from handlers.basic import start, handle_api_key, version_cmd
+from handlers.basic import start, handle_api_key, version_cmd, language_cmd, language_callback
 from handlers.events import add_event, conv_handler
 from handlers.agenda import agenda_cmd, agenda_callback
 from tasks.scheduler import send_daily_summaries
@@ -38,11 +38,16 @@ def main() -> None:
     # Basic handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("version", version_cmd))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key))
+    application.add_handler(CommandHandler("language", language_cmd))
+    application.add_handler(CallbackQueryHandler(language_callback, pattern="^lang_"))
 
     # Event handlers
     application.add_handler(CommandHandler("add", add_event))
     application.add_handler(conv_handler)
+    
+    # Fallback/catch-all for generic text (e.g., API key setup)
+    # Must be added AFTER conv_handler so it doesn't consume all text inputs
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key))
     
     # Agenda handlers
     application.add_handler(CommandHandler("agenda", agenda_cmd))
