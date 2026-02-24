@@ -103,6 +103,14 @@ async def process_new_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(msg)
         return ASK_TIME
         
+    try:
+        from datetime import datetime
+        datetime.strptime(text, "%H:%M")
+    except ValueError:
+        msg = await get_text("new_invalid_time", user_id)
+        await update.message.reply_text(msg)
+        return ASK_TIME
+        
     time_str = text.zfill(5)
     user_record = await get_user(user_id)
     is_enabled = user_record.get("agenda_enabled", 1) == 1

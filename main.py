@@ -46,16 +46,16 @@ def main() -> None:
     application.add_handler(CommandHandler("add", add_event))
     application.add_handler(conv_handler)
     
+    # Settings handler
+    application.add_handler(daily_settings_conv_handler)
+    
     # Fallback/catch-all for generic text (e.g., API key setup)
-    # Must be added AFTER conv_handler so it doesn't consume all text inputs
+    # Must be added AFTER conv_handler and settings_handler so it doesn't consume all text inputs
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key))
     
     # Agenda handlers
     application.add_handler(CommandHandler("agenda", agenda_cmd))
     application.add_handler(CallbackQueryHandler(agenda_callback, pattern="^agenda_"))
-    
-    # Settings handler
-    application.add_handler(daily_settings_conv_handler)
 
     # Setup Per-User Daily Summary Jobs
     job_queue = application.job_queue
