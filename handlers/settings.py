@@ -16,7 +16,7 @@ DAILY_MENU = 2
 ASK_TIME = 3
 LANG_MENU = 4
 
-async def send_master_settings(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False):
+async def send_master_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Renders the Master Settings Menu.
     """
@@ -29,15 +29,16 @@ async def send_master_settings(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    if is_callback:
+    if update.callback_query:
+        await update.callback_query.answer()
         await update.callback_query.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     else:
-        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.effective_message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
 async def master_settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entry point for /settings"""
     logger.info("master_settings_start triggered")
-    await send_master_settings(update, context, is_callback=False)
+    await send_master_settings(update, context)
     return MASTER_MENU
 
 async def master_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -46,10 +47,10 @@ async def master_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     
     if query.data == "goto_daily":
-        await send_settings_dashboard(update, context, is_callback=True)
+        await send_settings_dashboard(update, context)
         return DAILY_MENU
     elif query.data == "goto_lang":
-        await send_language_menu(update, context, is_callback=True)
+        await send_language_menu(update, context)
         return LANG_MENU
     
     return MASTER_MENU
@@ -57,10 +58,10 @@ async def master_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def return_to_master(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Back button handler"""
     await update.callback_query.answer()
-    await send_master_settings(update, context, is_callback=True)
+    await send_master_settings(update, context)
     return MASTER_MENU
 
-async def send_language_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False):
+async def send_language_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Renders Language selection dashboard.
     """
@@ -73,10 +74,11 @@ async def send_language_menu(update: Update, context: ContextTypes.DEFAULT_TYPE,
     reply_markup = InlineKeyboardMarkup(keyboard)
     msg = await get_text("language_prompt", user_id)
     
-    if is_callback:
+    if update.callback_query:
+        await update.callback_query.answer()
         await update.callback_query.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     else:
-        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.effective_message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
 async def handle_language_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -104,7 +106,7 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
     await query.edit_message_text(f"{msg}\n\n" + await get_text("language_prompt", user_id), reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     return LANG_MENU
 
-async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False):
+async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Renders the Daily Settings Dashboard based on current DB strings.
     """
@@ -113,10 +115,11 @@ async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_
     
     if not user_record or not user_record.get("morgen_api_key"):
         msg = await get_text("new_please_link", user_id)
-        if is_callback:
+        if update.callback_query:
+            await update.callback_query.answer()
             await update.callback_query.edit_message_text(msg)
         else:
-            await update.message.reply_text(msg)
+            await update.effective_message.reply_text(msg)
         return ConversationHandler.END
         
     is_enabled = user_record.get("agenda_enabled", 1) == 1
@@ -137,20 +140,21 @@ async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_
     
     dashboard_msg = await get_text("settings_dashboard", user_id, status=status_emoji, time=current_time)
     
-    if is_callback:
+    if update.callback_query:
+        await update.callback_query.answer()
         await update.callback_query.edit_message_text(dashboard_msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     else:
-        await update.message.reply_text(dashboard_msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.effective_message.reply_text(dashboard_msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
 # Kept as alias for direct command usage
 async def daily_settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entry point alias for /daily_settings"""
-    await send_settings_dashboard(update, context, is_callback=False)
+    await send_settings_dashboard(update, context)
     return DAILY_MENU
 
 async def language_settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entry point alias for /language"""
-    await send_language_menu(update, context, is_callback=False)
+    await send_language_menu(update, context)
     return LANG_MENU
 
 async def handle_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -176,7 +180,7 @@ async def handle_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         )
         
     # Redraw dashboard
-    await send_settings_dashboard(update, context, is_callback=True)
+    await send_settings_dashboard(update, context)
     return DAILY_MENU
 
 async def ask_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -227,7 +231,7 @@ async def process_new_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text(success_msg, parse_mode=ParseMode.MARKDOWN)
     
     # Redraw Dashboard as new message
-    await send_settings_dashboard(update, context, is_callback=False)
+    await send_settings_dashboard(update, context)
     return DAILY_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
