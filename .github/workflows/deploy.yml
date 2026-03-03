@@ -43,6 +43,10 @@ jobs:
           VERSION="1.0.${{ github.run_number }}-${SHORT_SHA}"
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "APP_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Docker requires lowercase repository names
+          REPO_LOWERCASE=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "REPO_LOWERCASE=$REPO_LOWERCASE" >> $GITHUB_ENV
 
       - name: Log in to the Container registry
         uses: docker/login-action@v2
@@ -55,7 +59,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ env.REPO_LOWERCASE }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
@@ -63,8 +67,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ env.APP_VERSION }}
+            ghcr.io/${{ env.REPO_LOWERCASE }}:latest
+            ghcr.io/${{ env.REPO_LOWERCASE }}:${{ env.APP_VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Send Telegram Notification
