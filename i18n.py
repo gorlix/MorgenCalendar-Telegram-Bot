@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 # Cache locales
 _locales = {}
 
+
 def load_locales():
     """Loads English and Italian JSON strings into memory."""
     locales_dir = Path(__file__).parent / "locales"
@@ -22,8 +23,10 @@ def load_locales():
             logger.error(f"Failed to load locale {lang}: {e}")
             _locales[lang] = {}
 
+
 # Initial load
 load_locales()
+
 
 async def get_text(key: str, user_id: int, **kwargs: Any) -> str:
     """
@@ -34,13 +37,13 @@ async def get_text(key: str, user_id: int, **kwargs: Any) -> str:
     lang = "en"
     if user_record and user_record.get("language"):
         lang = user_record["language"]
-        
+
     # Fallback to English if translation is missing
     if lang not in _locales or key not in _locales[lang]:
         lang = "en"
-        
+
     text = _locales.get(lang, {}).get(key, f"[{key}]")
-    
+
     # Format with kwargs
     if kwargs:
         try:
@@ -49,13 +52,14 @@ async def get_text(key: str, user_id: int, **kwargs: Any) -> str:
             logger.error(f"Missing format key {e} for i18n key '{key}'")
             return text
     return text
-    
+
+
 def get_text_sync(key: str, lang: str = "en", **kwargs: Any) -> str:
     """Synchronous getter mainly for formatters where user_id might be abstracted."""
     if lang not in _locales or key not in _locales[lang]:
         lang = "en"
     text = _locales.get(lang, {}).get(key, f"[{key}]")
-    
+
     if kwargs:
         try:
             return text.format(**kwargs)

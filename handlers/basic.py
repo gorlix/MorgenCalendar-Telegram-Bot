@@ -12,6 +12,7 @@ from i18n import get_text
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handler for the /start command.
@@ -27,30 +28,47 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = await get_text("start_dashboard", user_id)
         keyboard = [
             [
-                InlineKeyboardButton(await get_text("start_btn_guided", user_id), callback_data="dashboard_guided"),
-                InlineKeyboardButton(await get_text("start_btn_quick", user_id), callback_data="dashboard_quick")
+                InlineKeyboardButton(
+                    await get_text("start_btn_guided", user_id),
+                    callback_data="dashboard_guided",
+                ),
+                InlineKeyboardButton(
+                    await get_text("start_btn_quick", user_id),
+                    callback_data="dashboard_quick",
+                ),
             ],
             [
-                InlineKeyboardButton(await get_text("start_btn_agenda", user_id), callback_data="dashboard_agenda"),
-                InlineKeyboardButton(await get_text("start_btn_settings", user_id), callback_data="dashboard_settings")
-            ]
+                InlineKeyboardButton(
+                    await get_text("start_btn_agenda", user_id),
+                    callback_data="dashboard_agenda",
+                ),
+                InlineKeyboardButton(
+                    await get_text("start_btn_settings", user_id),
+                    callback_data="dashboard_settings",
+                ),
+            ],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(
+            msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
     else:
         welcome_msg += await get_text("start_link_prompt", user_id)
         await update.message.reply_text(welcome_msg, parse_mode=ParseMode.MARKDOWN)
 
-async def quick_event_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+async def quick_event_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     """
     Sends instructional text for creating a quick event.
     """
     query = update.callback_query
     await query.answer()
-    
+
     user_id = update.effective_user.id
     msg = await get_text("quick_event_guide", user_id)
-    
+
     # We send a new message instead of replacing the dashboard so the user can see both
     await query.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
@@ -71,10 +89,16 @@ async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         try:
             calendars = await morgen_client.list_calendars(text)
             if calendars:
-                await upsert_user(user_id, morgen_api_key=text, daily_summary_enabled=True)
-                await update.message.reply_text(await get_text("api_key_valid", user_id))
+                await upsert_user(
+                    user_id, morgen_api_key=text, daily_summary_enabled=True
+                )
+                await update.message.reply_text(
+                    await get_text("api_key_valid", user_id)
+                )
             else:
-                await update.message.reply_text(await get_text("api_key_valid_no_calendars", user_id))
+                await update.message.reply_text(
+                    await get_text("api_key_valid_no_calendars", user_id)
+                )
         except Exception as e:
             logger.error(f"Failed to validate API key for user {user_id}: {e}")
             await update.message.reply_text(await get_text("api_key_invalid", user_id))

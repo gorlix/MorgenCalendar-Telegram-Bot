@@ -6,6 +6,7 @@ import aiosqlite
 
 DB_PATH: str = os.getenv("DB_PATH", "morgen_bot.db")
 
+
 async def init_db() -> None:
     """
     Initialize the SQLite database.
@@ -20,8 +21,7 @@ async def init_db() -> None:
         os.makedirs(db_dir, exist_ok=True)
 
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            '''
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 telegram_user_id INTEGER PRIMARY KEY,
                 morgen_api_key TEXT,
@@ -31,28 +31,31 @@ async def init_db() -> None:
                 agenda_enabled BOOLEAN DEFAULT 1,
                 agenda_time TEXT DEFAULT '07:00'
             )
-            '''
-        )
+            """)
         await db.commit()
-        
+
         # Add 'language' column to existing DB if missing
         try:
             await db.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'en'")
             await db.commit()
         except aiosqlite.OperationalError:
-            pass # Column already exists
-            
+            pass  # Column already exists
+
         # Add Daily Settings columns if missing
         try:
-            await db.execute("ALTER TABLE users ADD COLUMN agenda_enabled BOOLEAN DEFAULT 1")
-            await db.execute("ALTER TABLE users ADD COLUMN agenda_time TEXT DEFAULT '07:00'")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN agenda_enabled BOOLEAN DEFAULT 1"
+            )
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN agenda_time TEXT DEFAULT '07:00'"
+            )
             await db.commit()
-            
+
             # Migrate the old state
             await db.execute("UPDATE users SET agenda_enabled = daily_summary_enabled")
             await db.commit()
         except aiosqlite.OperationalError:
-            pass # Columns already exist
+            pass  # Columns already exist
 
 
 async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
@@ -69,8 +72,7 @@ async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT * FROM users WHERE telegram_user_id = ?",
-            (telegram_user_id,)
+            "SELECT * FROM users WHERE telegram_user_id = ?", (telegram_user_id,)
         ) as cursor:
             row = await cursor.fetchone()
             if row:
@@ -85,7 +87,7 @@ async def upsert_user(
     daily_summary_enabled: Optional[bool] = None,
     language: Optional[str] = None,
     agenda_enabled: Optional[bool] = None,
-    agenda_time: Optional[str] = None
+    agenda_time: Optional[str] = None,
 ) -> None:
     """
     Insert a new user or update an existing user's details.
@@ -105,25 +107,25 @@ async def upsert_user(
         if not user:
             # Insert a new user
             await db.execute(
-                '''
+                """
                 INSERT INTO users (telegram_user_id, morgen_api_key, timezone, daily_summary_enabled, language, agenda_enabled, agenda_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     telegram_user_id,
                     morgen_api_key,
-                    timezone or 'UTC',
+                    timezone or "UTC",
                     1 if daily_summary_enabled else 0,
-                    language or 'en',
+                    language or "en",
                     1 if (agenda_enabled is not False) else 0,
-                    agenda_time or '07:00'
-                )
+                    agenda_time or "07:00",
+                ),
             )
         else:
             # Update existing user, only overriding provided fields
             query = "UPDATE users SET "
             params: List[Any] = []
-            
+
             if morgen_api_key is not None:
                 query += "morgen_api_key = ?, "
                 params.append(morgen_api_key)
@@ -142,14 +144,14 @@ async def upsert_user(
             if agenda_time is not None:
                 query += "agenda_time = ?, "
                 params.append(agenda_time)
-            
+
             # Remove trailing comma and space
-            query = query.rstrip(', ')
+            query = query.rstrip(", ")
             query += " WHERE telegram_user_id = ?"
             params.append(telegram_user_id)
-            
+
             await db.execute(query, tuple(params))
-            
+
         await db.commit()
 
 

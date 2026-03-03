@@ -13,6 +13,7 @@ from i18n import get_text
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
 
+
 async def agenda_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Displays the /agenda initial inline keyboard.
@@ -25,17 +26,29 @@ async def agenda_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     keyboard = [
-        [InlineKeyboardButton(await get_text("agenda_btn_today", user_id), callback_data="agenda_today"),
-         InlineKeyboardButton(await get_text("agenda_btn_tomorrow", user_id), callback_data="agenda_tomorrow")]
+        [
+            InlineKeyboardButton(
+                await get_text("agenda_btn_today", user_id),
+                callback_data="agenda_today",
+            ),
+            InlineKeyboardButton(
+                await get_text("agenda_btn_tomorrow", user_id),
+                callback_data="agenda_tomorrow",
+            ),
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     msg = await get_text("agenda_prompt", user_id)
-    
+
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.callback_query.edit_message_text(
+            msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
     else:
-        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(
+            msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
 
 
 async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -48,20 +61,20 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     action = query.data.split("_")[1]
     now = datetime.now(dt_timezone.utc)
     user_id = update.effective_user.id
-    
+
     if action == "today":
         day = now
         day_label_key = "agenda_btn_today"
     else:
         day = now + timedelta(days=1)
         day_label_key = "agenda_btn_tomorrow"
-        
+
     day_label = await get_text(day_label_key, user_id)
 
     # Define the 24-hour window for the selected day in UTC (rough estimation for generic usage)
     start_date = day.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=1)
-    
+
     start_str = start_date.strftime("%Y-%m-%dT%H:%M:%SZ")
     end_str = end_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -73,17 +86,18 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     try:
         events = await morgen_client.get_all_events(
-            api_key=api_key,
-            start_datetime=start_str,
-            end_datetime=end_str
+            api_key=api_key, start_datetime=start_str, end_datetime=end_str
         )
 
-        msg = format_agenda_message(events, day_label, user_id=user_id, lang=user_record.get('language', 'en'))
+        msg = format_agenda_message(
+            events, day_label, user_id=user_id, lang=user_record.get("language", "en")
+        )
         await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN_V2)
-        
+
     except RateLimitError as e:
         import re
-        match = re.search(r'wait (\d+) seconds', str(e))
+
+        match = re.search(r"wait (\d+) seconds", str(e))
         if match:
             seconds = int(match.group(1))
             minutes = seconds // 60
@@ -94,10 +108,10 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 time_str = f"{secs} seconds"
         else:
             time_str = "15 minutes"
-            
+
         rate_limit_msg = await get_text("agenda_rate_limit", user_id, time_str=time_str)
         await query.edit_message_text(rate_limit_msg)
-        
+
     except Exception as e:
         logger.error(f"Error fetching agenda: {e}")
         error_msg = await get_text("agenda_error", user_id)
