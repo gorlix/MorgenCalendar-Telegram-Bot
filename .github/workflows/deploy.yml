@@ -73,14 +73,3 @@ jobs:
             ghcr.io/${{ env.REPO_LOWERCASE }}:latest
             ghcr.io/${{ env.REPO_LOWERCASE }}:${{ env.APP_VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Send Telegram Notification
-        if: success()
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.ADMIN_TELEGRAM_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          message: |
-            🚀 New Bot Version Deployed Successfully!
-            🏷 Version: ${{ env.APP_VERSION }}
-            🔗 Commit: ${{ github.sha }}
