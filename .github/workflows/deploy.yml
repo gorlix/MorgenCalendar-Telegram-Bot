@@ -44,39 +44,28 @@ jobs:
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "APP_VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Server via SSH
-        uses: appleboy/ssh-action@v1.0.0
-        env:
-          APP_VERSION: ${{ env.APP_VERSION }}
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: APP_VERSION
-          # Assumes the repository is cloned at the path specified by the SERVER_APP_DIR secret
-          script: |
-            cd ${{ secrets.SERVER_APP_DIR }}
-            
-            # Create backups folder
-            mkdir -p backups
-            
-            # Backup the database with timestamp
-            if [ -f data/morgen_bot.db ]; then
-              cp data/morgen_bot.db backups/db_backup_$(date +%F_%T).db
-              echo "Database backed up successfully."
-            else
-              echo "No database found to backup."
-            fi
-            
-            # Pull latest changes
-            git pull origin main
-            
-            # Export Variables for docker-compose
-            export APP_VERSION=$APP_VERSION
-            
-            # Rebuild and restart containers
-            docker-compose down
-            docker-compose up -d --build
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ env.APP_VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Send Telegram Notification
         if: success()
