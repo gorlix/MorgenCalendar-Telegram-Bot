@@ -2,16 +2,10 @@ version: "3.8"
 
 services:
   bot:
-    build:
-      context: .
-      args:
-        APP_VERSION: ${APP_VERSION:-dev}
+    image: ghcr.io/gorlix/morgencalendar-telegram-bot:latest
     container_name: morgen_bot
     restart: unless-stopped
     environment:
-      # Replace this with your actual Telegram Bot Token from BotFather
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - APP_VERSION=${APP_VERSION:-dev}
     volumes:
-      # Mount the /data folder to persist the SQLite database across container restarts
       - ./data:/app/data
