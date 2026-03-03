@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 import datetime as dt
 
-from database import get_user, get_users_for_daily_summary
+from database import get_user
 from morgen_client import MorgenClient, RateLimitError
 from formatters import format_daily_summary
 from i18n import get_text

@@ -74,7 +74,8 @@ def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
     elif time_part:
         time_display = time_part
     else:
-        # Currently "All-day" but we can translate this if needed, skipping for now since UI doesn't explicitly display it unless it's timed
+        # Currently "All-day" but we can translate this if needed, skipping for now
+        # since UI doesn't explicitly display it unless it's timed
         time_display = "All-day"
 
     escaped_title = escape_markdown_v2(e_title)

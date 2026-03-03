@@ -2,7 +2,6 @@ import logging
 import httpx
 import asyncio
 from typing import Dict, Any, List, Optional
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +214,7 @@ class MorgenClient:
                 # Define batch size
                 batch_size = 5
                 batches = [
-                    cal_ids[i : i + batch_size]
+                    cal_ids[i : i + batch_size]  # noqa: E203
                     for i in range(0, len(cal_ids), batch_size)
                 ]
 

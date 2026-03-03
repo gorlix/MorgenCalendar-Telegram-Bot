@@ -1,4 +1,3 @@
-import asyncio
 import os
 from typing import Optional, List, Dict, Any
 
@@ -108,7 +107,8 @@ async def upsert_user(
             # Insert a new user
             await db.execute(
                 """
-                INSERT INTO users (telegram_user_id, morgen_api_key, timezone, daily_summary_enabled, language, agenda_enabled, agenda_time)
+                INSERT INTO users (telegram_user_id, morgen_api_key, timezone,
+                daily_summary_enabled, language, agenda_enabled, agenda_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -169,6 +169,7 @@ async def get_users_for_daily_summary() -> List[Dict[str, Any]]:
             "SELECT * FROM users WHERE daily_summary_enabled = 1 AND morgen_api_key IS NOT NULL"
         ) as cursor:
             rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
 
 
 async def get_users_with_agenda() -> List[Dict[str, Any]]:
