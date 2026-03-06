@@ -94,8 +94,9 @@ def update_user_agenda_job(
         return
 
     try:
+        from zoneinfo import ZoneInfo
         hour, minute = map(int, time_str.split(":"))
-        t = dt.time(hour=hour, minute=minute, second=0)
+        t = dt.time(hour=hour, minute=minute, second=0, tzinfo=ZoneInfo("Europe/Rome"))
     except Exception as e:
         logger.error(
             f"Failed to parse time string '{time_str}' for user {user_id}: {e}"
