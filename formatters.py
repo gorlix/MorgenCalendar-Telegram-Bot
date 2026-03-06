@@ -2,6 +2,7 @@ import re
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import html
 from i18n import get_text_sync
 
 
@@ -30,44 +31,58 @@ def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
     Returns:
         str: A formatted string for a single event.
     """
-    e_title = event.get("title") or ""
+    e_title = html.unescape(event.get("title") or "")
 
     e_start_raw = event.get("start", "")
     e_end_raw = event.get("end", "")
     e_duration = event.get("duration", "")
+    e_timezone = event.get("timeZone", "Europe/Rome")
     cal_name = event.get("calendar_name", "Unknown Calendar")
 
-    def parse_time(raw_str: str, duration_str: str = "") -> str:
+    def parse_time(raw_str: str, duration_str: str = "", tz_str: str = "Europe/Rome") -> str:
         if not raw_str or "T" not in raw_str or len(raw_str) <= 10:
             return ""
         try:
-            # Force +00:00 UTC offset for naive ISO strings from Morgen
-            if not raw_str.endswith("Z") and "+" not in raw_str:
-                raw_str += "+00:00"
-            raw_fixed = raw_str.replace("Z", "+00:00")
-            dt_utc = datetime.fromisoformat(raw_fixed)
-
-            # If we need to calculate end time from start + duration
-            if duration_str and duration_str.startswith("PT"):
-                h_match = re.search(r"(\d+)H", duration_str)
-                m_match = re.search(r"(\d+)M", duration_str)
-                hours = int(h_match.group(1)) if h_match else 0
-                minutes = int(m_match.group(1)) if m_match else 0
-                dt_utc += timedelta(hours=hours, minutes=minutes)
-
-            dt_rome = dt_utc.astimezone(ZoneInfo("Europe/Rome"))
-            return dt_rome.strftime("%H:%M")
+            tz = ZoneInfo(tz_str)
+            if raw_str.endswith("Z") or "+" in raw_str:
+                raw_fixed = raw_str.replace("Z", "+00:00")
+                dt_obj = datetime.fromisoformat(raw_fixed)
+                # If we need to calculate end time from start + duration
+                if duration_str and duration_str.startswith("PT"):
+                    h_match = re.search(r"(\d+)H", duration_str)
+                    m_match = re.search(r"(\d+)M", duration_str)
+                    hours = int(h_match.group(1)) if h_match else 0
+                    minutes = int(m_match.group(1)) if m_match else 0
+                    dt_obj += timedelta(hours=hours, minutes=minutes)
+                
+                dt_local = dt_obj.astimezone(ZoneInfo("Europe/Rome"))
+                return dt_local.strftime("%H:%M")
+            else:
+                # Naive datetime
+                dt_obj = datetime.fromisoformat(raw_str)
+                # Attach the given timezone
+                dt_obj = dt_obj.replace(tzinfo=tz)
+                
+                if duration_str and duration_str.startswith("PT"):
+                    h_match = re.search(r"(\d+)H", duration_str)
+                    m_match = re.search(r"(\d+)M", duration_str)
+                    hours = int(h_match.group(1)) if h_match else 0
+                    minutes = int(m_match.group(1)) if m_match else 0
+                    dt_obj += timedelta(hours=hours, minutes=minutes)
+                
+                dt_local = dt_obj.astimezone(ZoneInfo("Europe/Rome"))
+                return dt_local.strftime("%H:%M")
         except Exception:
             if "T" in raw_str:
                 return raw_str.split("T")[1][:5]
             return ""
 
-    time_part = parse_time(str(e_start_raw)) if e_start_raw else ""
+    time_part = parse_time(str(e_start_raw), tz_str=e_timezone) if e_start_raw else ""
     end_part = ""
     if e_end_raw:
-        end_part = parse_time(str(e_end_raw))
+        end_part = parse_time(str(e_end_raw), tz_str=e_timezone)
     elif e_duration and time_part:
-        end_part = parse_time(str(e_start_raw), str(e_duration))
+        end_part = parse_time(str(e_start_raw), str(e_duration), tz_str=e_timezone)
 
     if time_part and end_part:
         time_display = f"{time_part} -> {end_part}"
@@ -108,7 +123,7 @@ def build_event_list_text(events: List[Dict[str, Any]], lang: str = "en") -> str
         header = get_text_sync("agenda_all_day_header", lang=lang)
         msg += header
         for ev in all_day_events:
-            title = escape_markdown_v2(ev.get("title", ""))
+            title = escape_markdown_v2(html.unescape(ev.get("title", "")))
             cal = escape_markdown_v2(f"[{ev.get('calendar_name', 'Unknown Calendar')}]")
             msg += f"\\- {cal} {title}\n"
 
