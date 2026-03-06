@@ -95,6 +95,7 @@ def update_user_agenda_job(
 
     try:
         from zoneinfo import ZoneInfo
+
         hour, minute = map(int, time_str.split(":"))
         t = dt.time(hour=hour, minute=minute, second=0, tzinfo=ZoneInfo("Europe/Rome"))
     except Exception as e:

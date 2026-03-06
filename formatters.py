@@ -39,7 +39,9 @@ def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
     e_timezone = event.get("timeZone", "Europe/Rome")
     cal_name = event.get("calendar_name", "Unknown Calendar")
 
-    def parse_time(raw_str: str, duration_str: str = "", tz_str: str = "Europe/Rome") -> str:
+    def parse_time(
+        raw_str: str, duration_str: str = "", tz_str: str = "Europe/Rome"
+    ) -> str:
         if not raw_str or "T" not in raw_str or len(raw_str) <= 10:
             return ""
         try:
@@ -54,7 +56,7 @@ def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
                     hours = int(h_match.group(1)) if h_match else 0
                     minutes = int(m_match.group(1)) if m_match else 0
                     dt_obj += timedelta(hours=hours, minutes=minutes)
-                
+
                 dt_local = dt_obj.astimezone(ZoneInfo("Europe/Rome"))
                 return dt_local.strftime("%H:%M")
             else:
@@ -62,14 +64,14 @@ def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
                 dt_obj = datetime.fromisoformat(raw_str)
                 # Attach the given timezone
                 dt_obj = dt_obj.replace(tzinfo=tz)
-                
+
                 if duration_str and duration_str.startswith("PT"):
                     h_match = re.search(r"(\d+)H", duration_str)
                     m_match = re.search(r"(\d+)M", duration_str)
                     hours = int(h_match.group(1)) if h_match else 0
                     minutes = int(m_match.group(1)) if m_match else 0
                     dt_obj += timedelta(hours=hours, minutes=minutes)
-                
+
                 dt_local = dt_obj.astimezone(ZoneInfo("Europe/Rome"))
                 return dt_local.strftime("%H:%M")
         except Exception:
