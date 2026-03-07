@@ -26,6 +26,7 @@ DAILY_MENU = 2
 ASK_TIME = 3
 LANG_MENU = 4
 CALENDAR_MENU = 5
+LOGOUT_CONFIRM = 6
 
 
 async def send_master_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,6 +53,12 @@ async def send_master_settings(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton(
                 await get_text("settings_btn_language", user_id),
                 callback_data="goto_lang",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                await get_text("settings_btn_logout", user_id),
+                callback_data="goto_logout",
             )
         ],
     ]
@@ -90,6 +97,8 @@ async def master_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return LANG_MENU
     elif query.data == "goto_calendar":
         return await send_calendar_menu(update, context)
+    elif query.data == "goto_logout":
+        return await logout_confirmation(update, context)
 
     return MASTER_MENU
 
@@ -276,6 +285,76 @@ async def handle_calendar_selection(
     return CALENDAR_MENU
 
 
+async def logout_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Asks the user to confirm logout.
+    """
+    user_id = update.effective_user.id
+    msg = await get_text("logout_confirm_prompt", user_id)
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                await get_text("logout_btn_confirm", user_id),
+                callback_data="logout_confirm",
+            ),
+            InlineKeyboardButton(
+                await get_text("logout_btn_cancel", user_id),
+                callback_data="logout_cancel",
+            ),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        await update.message.reply_text(
+            msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
+        )
+
+    return LOGOUT_CONFIRM
+
+
+async def handle_logout_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """
+    Handles the confirm/cancel logout buttons.
+    """
+    query = update.callback_query
+    await query.answer()
+
+    user_id = update.effective_user.id
+
+    if query.data == "logout_confirm":
+        # 1. Unschedule the user's agenda job if it exists
+        if context.application.job_queue:
+            update_user_agenda_job(
+                context.application.job_queue, user_id, is_enabled=False, time_str="07:00"
+            )
+
+        # 2. Delete the user from the database
+        from database import delete_user
+
+        await delete_user(user_id)
+
+        # 3. Notify the user
+        msg = await get_text("logout_success", user_id)
+        await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+
+    elif query.data == "logout_cancel":
+        msg = await get_text("logout_cancelled", user_id)
+        await query.edit_message_text(msg)
+        return await return_to_master(update, context)
+
+    return LOGOUT_CONFIRM
+
+
 async def send_settings_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Renders the Daily Settings Dashboard based on current DB strings.
@@ -450,12 +529,13 @@ master_settings_conv_handler = ConversationHandler(
         CommandHandler("settings", master_settings_start),
         CommandHandler("daily_settings", daily_settings_start),
         CommandHandler("language", language_settings_start),
+        CommandHandler("logout", logout_confirmation),
         CallbackQueryHandler(master_settings_start, pattern="^dashboard_settings$"),
     ],
     states={
         MASTER_MENU: [
             CallbackQueryHandler(
-                master_callback, pattern="^(goto_daily|goto_lang|goto_calendar)$"
+                master_callback, pattern="^(goto_daily|goto_lang|goto_calendar|goto_logout)$"
             )
         ],
         DAILY_MENU: [
@@ -471,6 +551,9 @@ master_settings_conv_handler = ConversationHandler(
         CALENDAR_MENU: [
             CallbackQueryHandler(handle_calendar_selection, pattern="^setcal_"),
             CallbackQueryHandler(return_to_master, pattern="^back_master$"),
+        ],
+        LOGOUT_CONFIRM: [
+            CallbackQueryHandler(handle_logout_callback, pattern="^logout_(confirm|cancel)$")
         ],
     },
     fallbacks=[CommandHandler("cancel", cancel)],

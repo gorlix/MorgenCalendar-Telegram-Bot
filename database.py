@@ -209,3 +209,17 @@ async def get_users_with_agenda() -> List[Dict[str, Any]]:
         ) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+async def delete_user(telegram_user_id: int) -> None:
+    """
+    Delete a user from the database by their Telegram ID.
+
+    Args:
+        telegram_user_id (int): The unique identifier of the Telegram user.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM users WHERE telegram_user_id = ?", (telegram_user_id,)
+        )
+        await db.commit()

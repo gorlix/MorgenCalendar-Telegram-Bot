@@ -67,5 +67,11 @@
     "start_btn_settings": "⚙️ Settings",
     "quick_event_guide": "To create a quick event, use the `/add` command followed by the title, date, and time:\n\n`/add Lunch with Anna 24-02 13:00 1H30M`\n\n- **Date**: `DD-MM`\n- **Time**: `HH:MM`\n- **Duration**: `1H`, `45M` (optional)",
     "calendar_prompt": "🗓 **Default Calendar**\n\nChoose the calendar that will be used by default when creating new events with `/add`:",
-    "calendar_updated": "✅ Default calendar successfully set to **{calendar}**."
+    "calendar_updated": "✅ Default calendar successfully set to **{calendar}**.",
+    "settings_btn_logout": "🔴 Logout",
+    "logout_confirm_prompt": "Are you sure you want to logout? This will delete all your saved data and disconnect your account.",
+    "logout_btn_confirm": "Yes, logout",
+    "logout_btn_cancel": "Cancel",
+    "logout_success": "✅ You have been logged out. All local data has been deleted.",
+    "logout_cancelled": "Logout cancelled."
 }

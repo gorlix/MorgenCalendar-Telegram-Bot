@@ -67,5 +67,11 @@
     "start_btn_settings": "⚙️ Impostazioni",
     "quick_event_guide": "Per creare un evento rapido, usa il comando `/add` seguito da titolo, data e ora:\n\n`/add Pranzo con Anna 24-02 13:00 1H30M`\n\n- **Data**: `GG-MM`\n- **Ora**: `HH:MM`\n- **Durata**: `1H`, `45M` (opzionale)",
     "calendar_prompt": "🗓 **Calendario Predefinito**\n\nScegli il calendario che verrà utilizzato di default quando crei nuovi eventi con `/add`:",
-    "calendar_updated": "✅ Il calendario predefinito è stato impostato su **{calendar}**."
+    "calendar_updated": "✅ Il calendario predefinito è stato impostato su **{calendar}**.",
+    "settings_btn_logout": "🔴 Logout",
+    "logout_confirm_prompt": "Sei sicuro di voler uscire? Questo eliminerà tutti i tuoi dati salvati e scollegherà il tuo account.",
+    "logout_btn_confirm": "Sì, logout",
+    "logout_btn_cancel": "Annulla",
+    "logout_success": "✅ Sei uscito con successo. Tutti i dati locali sono stati eliminati.",
+    "logout_cancelled": "Logout annullato."
 }
