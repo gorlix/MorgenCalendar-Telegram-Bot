@@ -26,7 +26,7 @@
     "daily_summary_delayed": "⚠️ Morgen API Rate Limit exceeded. Your points will reset in {time_str}. Daily summary delayed.",
     "add_invalid_format": "❌ *Invalid format.*\n\nHow to use the quick add command:\n`/add <Title> <DD-MM> <HH:MM> [End OR Duration]`\n\n· `<Title>`: The name of your event (spaces allowed).\n· `<DD-MM>`: Day and month (e.g., `28-02`).\n· `<HH:MM>`: Start time (e.g., `15:00`).\n· `[Optional End]`: An end time (`16:30`) OR a duration (`1H30M`, `45M`). Defaults to 1 hour if omitted.",
     "add_invalid_datetime": "❌ Invalid date or time values.",
-    "add_no_primary_cal": "❌ Could not find a primary writable calendar on your Morgen account.",
+    "add_no_primary_cal": "❌ Could not find a primary writable calendar. Please check your Morgen account or configure one via /settings.",
     "add_success": "✅ Successfully created event: **{title}**",
     "add_failed": "❌ Failed to create event. Please check the logs.",
     "new_please_link": "Please set your Morgen API Key using /start first.",
@@ -58,11 +58,14 @@
     "settings_master_title": "⚙️ **Settings**\n\nChoose an option below:",
     "settings_btn_daily": "📅 Daily Agenda Settings",
     "settings_btn_language": "🌍 Language / Lingua",
+    "settings_btn_calendar": "🗓 Default Calendar",
     "settings_btn_back": "🔙 Back",
     "start_dashboard": "Welcome! What would you like to do?",
     "start_btn_guided": "➕ Guided Event",
     "start_btn_quick": "⚡ Quick Event",
     "start_btn_agenda": "📅 Agenda",
     "start_btn_settings": "⚙️ Settings",
-    "quick_event_guide": "To create a quick event, use the `/add` command followed by the title, date, and time:\n\n`/add Lunch with Anna 24-02 13:00 1H30M`\n\n- **Date**: `DD-MM`\n- **Time**: `HH:MM`\n- **Duration**: `1H`, `45M` (optional)"
+    "quick_event_guide": "To create a quick event, use the `/add` command followed by the title, date, and time:\n\n`/add Lunch with Anna 24-02 13:00 1H30M`\n\n- **Date**: `DD-MM`\n- **Time**: `HH:MM`\n- **Duration**: `1H`, `45M` (optional)",
+    "calendar_prompt": "🗓 **Default Calendar**\n\nChoose the calendar that will be used by default when creating new events with `/add`:",
+    "calendar_updated": "✅ Default calendar successfully set to **{calendar}**."
 }

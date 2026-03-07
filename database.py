@@ -20,7 +20,8 @@ async def init_db() -> None:
         os.makedirs(db_dir, exist_ok=True)
 
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+        await db.execute(
+            """
             CREATE TABLE IF NOT EXISTS users (
                 telegram_user_id INTEGER PRIMARY KEY,
                 morgen_api_key TEXT,
@@ -28,9 +29,12 @@ async def init_db() -> None:
                 daily_summary_enabled BOOLEAN DEFAULT 0,
                 language TEXT DEFAULT 'en',
                 agenda_enabled BOOLEAN DEFAULT 1,
-                agenda_time TEXT DEFAULT '07:00'
+                agenda_time TEXT DEFAULT '07:00',
+                default_calendar_id TEXT,
+                default_account_id TEXT
             )
-            """)
+            """
+        )
         await db.commit()
 
         # Add 'language' column to existing DB if missing
@@ -52,6 +56,14 @@ async def init_db() -> None:
 
             # Migrate the old state
             await db.execute("UPDATE users SET agenda_enabled = daily_summary_enabled")
+            await db.commit()
+        except aiosqlite.OperationalError:
+            pass  # Columns already exist
+
+        # Add default calendar settings if missing
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN default_calendar_id TEXT")
+            await db.execute("ALTER TABLE users ADD COLUMN default_account_id TEXT")
             await db.commit()
         except aiosqlite.OperationalError:
             pass  # Columns already exist
@@ -87,6 +99,8 @@ async def upsert_user(
     language: Optional[str] = None,
     agenda_enabled: Optional[bool] = None,
     agenda_time: Optional[str] = None,
+    default_calendar_id: Optional[str] = None,
+    default_account_id: Optional[str] = None,
 ) -> None:
     """
     Insert a new user or update an existing user's details.
@@ -99,6 +113,8 @@ async def upsert_user(
         language (Optional[str]): The user's preferred language. Defaults to None.
         agenda_enabled (Optional[bool]): Whether daily agendas are toggled on.
         agenda_time (Optional[str]): The HH:MM time string for the summary.
+        default_calendar_id (Optional[str]): User preference for default calendar ID.
+        default_account_id (Optional[str]): Account ID associated with the default calendar.
     """
     user = await get_user(telegram_user_id)
 
@@ -108,8 +124,9 @@ async def upsert_user(
             await db.execute(
                 """
                 INSERT INTO users (telegram_user_id, morgen_api_key, timezone,
-                daily_summary_enabled, language, agenda_enabled, agenda_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                daily_summary_enabled, language, agenda_enabled, agenda_time,
+                default_calendar_id, default_account_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     telegram_user_id,
@@ -119,6 +136,8 @@ async def upsert_user(
                     language or "en",
                     1 if (agenda_enabled is not False) else 0,
                     agenda_time or "07:00",
+                    default_calendar_id,
+                    default_account_id,
                 ),
             )
         else:
@@ -144,6 +163,12 @@ async def upsert_user(
             if agenda_time is not None:
                 query += "agenda_time = ?, "
                 params.append(agenda_time)
+            if default_calendar_id is not None:
+                query += "default_calendar_id = ?, "
+                params.append(default_calendar_id)
+            if default_account_id is not None:
+                query += "default_account_id = ?, "
+                params.append(default_account_id)
 
             # Remove trailing comma and space
             query = query.rstrip(", ")
