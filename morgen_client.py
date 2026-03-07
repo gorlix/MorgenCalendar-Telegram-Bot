@@ -55,19 +55,35 @@ class MorgenClient:
         data = response.json()
         return data.get("data", {}).get("calendars", [])
 
-    async def get_primary_calendar(self, api_key: str) -> Optional[Dict[str, Any]]:
+    async def get_primary_calendar(
+        self, api_key: str, preferred_calendar_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Identify the first writable calendar to use as the default/primary calendar.
+        Identify the primary calendar to use.
+        If a preferred_calendar_id is given and it is writable, it returns it.
+        Otherwise, returns the first writable calendar as fallback.
 
         Args:
             api_key (str): The user's Morgen API key.
+            preferred_calendar_id (Optional[str]): A calendar ID the user prefers.
 
         Returns:
             Optional[Dict[str, Any]]: The primary calendar object if found, else None.
         """
         try:
             calendars = await self.list_calendars(api_key)
-            # Find a calendar where we can create items
+
+            # First, check if the preferred calendar is valid and writable
+            if preferred_calendar_id:
+                for cal in calendars:
+                    if cal.get("id") == preferred_calendar_id:
+                        my_rights = cal.get("myRights", {})
+                        if my_rights.get("mayWriteItems", True) or my_rights.get(
+                            "mayWriteAll", True
+                        ):
+                            return cal
+
+            # Fallback: Find a calendar where we can create items
             for cal in calendars:
                 my_rights = cal.get("myRights", {})
                 if my_rights.get("mayWriteItems", True) or my_rights.get(

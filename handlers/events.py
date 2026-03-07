@@ -114,7 +114,10 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(msg)
         return
 
-    primary_cal = await morgen_client.get_primary_calendar(api_key)
+    # Check for user's preferred default calendar
+    preferred_cal_id = user_record.get("default_calendar_id")
+
+    primary_cal = await morgen_client.get_primary_calendar(api_key, preferred_cal_id)
     if not primary_cal:
         msg = await get_text("add_no_primary_cal", user_id)
         await update.message.reply_text(msg)

@@ -2,9 +2,11 @@ version: "3.8"
 
 services:
   bot:
+    build: .
     image: ghcr.io/gorlix/morgencalendar-telegram-bot:latest
     container_name: morgen_bot
     restart: unless-stopped
+    network_mode: host
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
     volumes:
