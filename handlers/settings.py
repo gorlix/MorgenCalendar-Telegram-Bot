@@ -529,12 +529,16 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def stop_nested(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Silent exit for nested conversations when a global command is issued."""
+    return ConversationHandler.END
+
+
 master_settings_conv_handler = ConversationHandler(
     entry_points=[
         CommandHandler("settings", master_settings_start),
         CommandHandler("daily_settings", daily_settings_start),
         CommandHandler("language", language_settings_start),
-        CommandHandler("logout", logout_confirmation),
         CallbackQueryHandler(master_settings_start, pattern="^dashboard_settings$"),
     ],
     states={
@@ -564,5 +568,28 @@ master_settings_conv_handler = ConversationHandler(
             )
         ],
     },
-    fallbacks=[CommandHandler("cancel", cancel)],
+    fallbacks=[
+        CommandHandler("cancel", cancel),
+        CommandHandler("start", stop_nested),
+        CommandHandler("add", stop_nested),
+        CommandHandler("agenda", stop_nested),
+        CommandHandler("logout", stop_nested),
+    ],
+)
+
+logout_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("logout", logout_confirmation)],
+    states={
+        LOGOUT_CONFIRM: [
+            CallbackQueryHandler(
+                handle_logout_callback, pattern="^logout_(confirm|cancel)$"
+            )
+        ],
+    },
+    fallbacks=[
+        CommandHandler("cancel", cancel),
+        CommandHandler("start", stop_nested),
+        CommandHandler("add", stop_nested),
+        CommandHandler("agenda", stop_nested),
+    ],
 )

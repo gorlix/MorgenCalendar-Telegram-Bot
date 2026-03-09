@@ -5,16 +5,14 @@ import asyncio
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
-    filters,
 )
 
 from database import init_db, get_users_with_agenda
-from handlers.basic import start, handle_api_key, version_cmd, quick_event_callback
+from handlers.basic import version_cmd, quick_event_callback, onboarding_conv_handler
 from handlers.events import add_event, conv_handler
 from handlers.agenda import agenda_cmd, agenda_callback
-from handlers.settings import master_settings_conv_handler
+from handlers.settings import master_settings_conv_handler, logout_conv_handler
 from tasks.scheduler import update_user_agenda_job
 
 # Enable logging
@@ -44,7 +42,7 @@ def main() -> None:
     application = ApplicationBuilder().token(token).build()
 
     # Basic handlers
-    application.add_handler(CommandHandler("start", start))
+    application.add_handler(onboarding_conv_handler)
     application.add_handler(CommandHandler("version", version_cmd))
     application.add_handler(
         CallbackQueryHandler(quick_event_callback, pattern="^dashboard_quick$")
@@ -55,13 +53,8 @@ def main() -> None:
     application.add_handler(conv_handler)
 
     # Settings handler
+    application.add_handler(logout_conv_handler)
     application.add_handler(master_settings_conv_handler)
-
-    # Fallback/catch-all for generic text (e.g., API key setup)
-    # Must be added AFTER conv_handler and settings_handler so it doesn't consume all text inputs
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key)
-    )
 
     # Agenda handlers
     application.add_handler(CommandHandler("agenda", agenda_cmd))

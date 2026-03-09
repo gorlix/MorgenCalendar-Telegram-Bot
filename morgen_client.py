@@ -24,7 +24,11 @@ class MorgenClient:
         """
         Initialize the MorgenClient.
         """
-        self.client: httpx.AsyncClient = httpx.AsyncClient(timeout=10.0)
+        # Force IPv4 to avoid common network issues with dual-stack on some hosts
+        transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+        self.client: httpx.AsyncClient = httpx.AsyncClient(
+            timeout=15.0, transport=transport
+        )
 
     def _auth_headers(self, api_key: str) -> Dict[str, str]:
         """

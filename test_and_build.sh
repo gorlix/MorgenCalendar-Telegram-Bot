@@ -25,11 +25,11 @@ echo "✅ Exported APP_VERSION=${APP_VERSION}"
 
 # 3. Run docker-compose build 
 echo "🔨 Building Docker image..."
-docker-compose build
+docker compose build
 
 # 4. Start the container in detached mode
 echo "🚀 Starting containers..."
-docker-compose up -d
+docker compose up -d
 
 # 5. Pause for 5 seconds to let the bot initialize
 echo "⏳ Waiting 5 seconds for the bot to initialize..."
@@ -51,14 +51,11 @@ docker-compose logs --tail=15
 echo "-----------------------------------------"
 echo ""
 
-# 8. Automatically clean up by running docker-compose down
-echo "🧹 Cleaning up... stopping and removing containers."
-docker-compose down
+# 8. Keep it running and show logs
+echo "✨ Bot is running! Try interacting with it in Telegram."
+echo "💡 You can view logs in real-time with: docker compose logs -f"
+echo "🛑 Press Ctrl+C to stop the bot and cleanup."
 
-# Remove the temporary .env if we created it
-if [ "$TEMP_ENV_CREATED" -eq 1 ]; then
-    echo "🗑️ Removing the temporary .env file..."
-    rm .env
-fi
-
-echo "✅ Local build and test process completed."
+# Trap Ctrl+C to cleanup
+trap "docker compose down && exit" INT
+docker compose logs -f
