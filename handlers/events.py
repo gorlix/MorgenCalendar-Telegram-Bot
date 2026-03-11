@@ -116,7 +116,8 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             calendar_target = remainder
 
     logger.debug(
-        f"Regex matched: title='{title}', date='{date_str_raw}', time='{time_str}', duration='{duration_iso}', target='{calendar_target}'"
+        f"Regex matched: title='{title}', date='{date_str_raw}', "
+        f"time='{time_str}', duration='{duration_iso}', target='{calendar_target}'"
     )
 
     lang = user_record.get("language", "en") if user_record else "en"
