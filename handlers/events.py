@@ -17,6 +17,8 @@ from telegram.constants import ParseMode
 from database import get_user
 from morgen_client import MorgenClient
 from i18n import get_text
+from utils.date_parser import parse_date
+from utils.calendar_matcher import match_calendar
 
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
@@ -37,8 +39,11 @@ def get_naive_iso_string(date_str: str, time_str: str) -> str:
 
 async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Quick Insert Command (/add)
-    Expected format: /add <Title> <DD-MM> <HH:MM>
+    Handle the /add quick-insert command.
+
+    Parses the command using the format
+    ``/add <Title> <Date_or_Day> <HH:MM> [duration_or_end] [calendar_target]``, resolves the target
+    calendar, and creates the event via the Morgen API.
     """
     user_id = update.effective_user.id
     user_record = await get_user(user_id)
@@ -50,11 +55,10 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     api_key = user_record["morgen_api_key"]
 
-    # We use update.message.text to parse with regex since context.args splits by space
-    # and the title may contain spaces.
     text = update.message.text.strip()
+    # /add <Title> <Date> <Time> [Remainder]
     match = re.match(
-        r"^/add\s+(.+?)\s+(\d{1,2}-\d{1,2})\s+(\d{1,2}:\d{2})(?:\s+([a-zA-Z0-9:]+))?$",
+        r"^/add\s+(.+?)\s+([a-zA-Z0-9-]+)\s+(\d{1,2}:\d{2})(?:\s+(.+))?$",
         text,
     )
 
@@ -64,70 +68,118 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     title = match.group(1).strip()
-    date_dd_mm = match.group(2)
-    time_str = match.group(3)
-    optional_arg = match.group(4)
+    date_str_raw = match.group(2).strip()
+    time_str = match.group(3).strip()
+    remainder = match.group(4)
 
     duration_iso = "PT1H"  # default
+    calendar_target = None
 
-    if optional_arg:
-        optional_arg = optional_arg.upper()
-        if ":" in optional_arg:
-            try:
-                start_dt = datetime.strptime(time_str, "%H:%M")
-                end_dt = datetime.strptime(optional_arg, "%H:%M")
-                if end_dt < start_dt:
-                    end_dt += timedelta(days=1)
+    if remainder:
+        remainder = remainder.strip()
+        parts = remainder.split(maxsplit=1)
+        first_part = parts[0].upper()
 
-                diff_sec = int((end_dt - start_dt).total_seconds())
-                h = diff_sec // 3600
-                m = (diff_sec % 3600) // 60
+        # Strict regex for duration or end time (e.g. '1H', '30M', '15:30')
+        if re.match(r"^\d+[HM]$", first_part) or re.match(
+            r"^\d{1,2}:\d{2}$", first_part
+        ):
+            optional_arg = first_part
+            if len(parts) > 1:
+                calendar_target = parts[1].strip()
 
-                dur_parts = ["PT"]
-                if h > 0:
-                    dur_parts.append(f"{h}H")
-                if m > 0:
-                    dur_parts.append(f"{m}M")
+            if ":" in optional_arg:
+                try:
+                    start_dt = datetime.strptime(time_str, "%H:%M")
+                    end_dt = datetime.strptime(optional_arg, "%H:%M")
+                    if end_dt < start_dt:
+                        end_dt += timedelta(days=1)
 
-                if len(dur_parts) > 1:
-                    duration_iso = "".join(dur_parts)
-            except ValueError:
-                pass
-        elif "H" in optional_arg or "M" in optional_arg:
-            duration_iso = f"PT{optional_arg}"
+                    diff_sec = int((end_dt - start_dt).total_seconds())
+                    h = diff_sec // 3600
+                    m = (diff_sec % 3600) // 60
 
-    logger.info(
-        f"Regex matched! Title: '{title}', Date: '{date_dd_mm}', Time: '{time_str}', Duration ISO: '{duration_iso}'"
+                    dur_parts = ["PT"]
+                    if h > 0:
+                        dur_parts.append(f"{h}H")
+                    if m > 0:
+                        dur_parts.append(f"{m}M")
+
+                    if len(dur_parts) > 1:
+                        duration_iso = "".join(dur_parts)
+                except ValueError:
+                    pass
+            elif "H" in optional_arg or "M" in optional_arg:
+                duration_iso = f"PT{optional_arg}"
+        else:
+            # First part is not a duration, so the entire remainder is the calendar target
+            calendar_target = remainder
+
+    logger.debug(
+        f"Regex matched: title='{title}', date='{date_str_raw}', time='{time_str}', duration='{duration_iso}', target='{calendar_target}'"
     )
 
-    # Reformat date to YYYY-MM-DD
-    current_year = datetime.now().year
-    day, month = date_dd_mm.split("-")
-    date_str = f"{current_year}-{month.zfill(2)}-{day.zfill(2)}"
+    lang = user_record.get("language", "en") if user_record else "en"
 
-    # Basic time validation
+    try:
+        date_str = parse_date(date_str_raw, lang=lang)
+    except ValueError as e:
+        logger.error(f"Error parsing date: {e}")
+        msg = await get_text("add_invalid_datetime", user_id)
+        await update.message.reply_text(msg)
+        return
+
     try:
         start_naive_iso = get_naive_iso_string(date_str, time_str)
-        logger.info(f"Constructed start datetime ISO: {start_naive_iso}")
+        logger.debug(f"Constructed start datetime ISO: {start_naive_iso}")
     except ValueError:
         msg = await get_text("add_invalid_datetime", user_id)
         await update.message.reply_text(msg)
         return
 
-    # Check for user's preferred default calendar
-    preferred_cal_id = user_record.get("default_calendar_id")
-
-    primary_cal = await morgen_client.get_primary_calendar(api_key, preferred_cal_id)
-    if not primary_cal:
-        msg = await get_text("add_no_primary_cal", user_id)
+    try:
+        calendars = await morgen_client.list_calendars(api_key)
+        writable_cals = [
+            cal
+            for cal in calendars
+            if cal.get("selected") is not False
+            and (
+                cal.get("myRights", {}).get("mayWriteItems")
+                or cal.get("myRights", {}).get("mayWriteAll")
+            )
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching calendars: {e}")
+        msg = await get_text("new_error_fetching_cals", user_id)
         await update.message.reply_text(msg)
         return
 
-    account_id = primary_cal["accountId"]
-    calendar_id = primary_cal["id"]
+    if not writable_cals:
+        msg = await get_text("new_no_writable_cals", user_id)
+        await update.message.reply_text(msg)
+        return
 
-    logger.info(
-        f"Primary Calendar selected -> ID: {calendar_id}, Account: {account_id}"
+    target_cal = None
+    if calendar_target:
+        target_cal = match_calendar(writable_cals, calendar_target)
+
+    if not target_cal:
+        preferred_cal_id = user_record.get("default_calendar_id")
+        selected_cal = None
+        if preferred_cal_id:
+            for cal in writable_cals:
+                if cal.get("id") == preferred_cal_id:
+                    selected_cal = cal
+                    break
+        if not selected_cal:
+            selected_cal = writable_cals[0]
+        target_cal = selected_cal
+
+    account_id = target_cal["accountId"]
+    calendar_id = target_cal["id"]
+
+    logger.debug(
+        f"Target calendar selected: id={calendar_id}, account={account_id}, name={target_cal.get('name')}"
     )
 
     try:
@@ -141,11 +193,59 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             timezone="Europe/Rome",
         )
         msg = await get_text("add_success", user_id, title=title)
+        if calendar_target:
+            msg += f"\n🗓 Calendar: {target_cal.get('name')}"
         await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Error creating event: {e}")
         msg = await get_text("add_failed", user_id)
         await update.message.reply_text(msg)
+
+
+async def list_calendars_cmd(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """
+    Lists all available writable calendars numbered starting from 1.
+    """
+    user_id = update.effective_user.id
+    user_record = await get_user(user_id)
+
+    if not user_record or not user_record.get("morgen_api_key"):
+        msg = await get_text("new_please_link", user_id)
+        await update.message.reply_text(msg)
+        return
+
+    api_key = user_record["morgen_api_key"]
+    try:
+        calendars = await morgen_client.list_calendars(api_key)
+        writable_cals = [
+            cal
+            for cal in calendars
+            if cal.get("selected") is not False
+            and (
+                cal.get("myRights", {}).get("mayWriteItems")
+                or cal.get("myRights", {}).get("mayWriteAll")
+            )
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching calendars: {e}")
+        msg = await get_text("new_error_fetching_cals", user_id)
+        await update.message.reply_text(msg)
+        return
+
+    if not writable_cals:
+        msg = await get_text("new_no_writable_cals", user_id)
+        await update.message.reply_text(msg)
+        return
+
+    response = "🗓 *Available Calendars:*\n\n"
+    for i, cal in enumerate(writable_cals, start=1):
+        name = cal.get("name", "Unknown")
+        response += f"*{i}.* {name}\n"
+
+    response += "\n_Use the number or name in the /add command!_"
+    await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
 
 
 # --- Interactive Wizard (/new) ---
