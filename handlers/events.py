@@ -19,6 +19,7 @@ from morgen_client import MorgenClient
 from i18n import get_text
 from utils.date_parser import parse_date
 from utils.calendar_matcher import match_calendar
+from utils.inline_calendar import build_calendar_keyboard, process_calendar_callback
 
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
@@ -286,22 +287,12 @@ async def ask_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["title"] = title_text
 
     user_id = update.effective_user.id
+    user_record = await get_user(user_id)
+    lang = user_record.get("language", "en") if user_record else "en"
 
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                await get_text("new_btn_today", user_id), callback_data="date_today"
-            ),
-            InlineKeyboardButton(
-                await get_text("new_btn_tomorrow", user_id),
-                callback_data="date_tomorrow",
-            ),
-            InlineKeyboardButton(
-                await get_text("new_btn_in2days", user_id), callback_data="date_in2days"
-            ),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    now = datetime.now(ZoneInfo("Europe/Rome"))
+    reply_markup = build_calendar_keyboard(now.year, now.month, lang)
+
     msg = await get_text("new_ask_date", user_id)
     await update.message.reply_text(
         msg, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN
@@ -311,37 +302,52 @@ async def ask_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def process_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Process date input (either callback or text)"""
-    now = datetime.now(ZoneInfo("Europe/Rome"))
+    """Process date input (interactive calendar callback or NLP text fallback)"""
     logger.info("process_date triggered")
 
     user_id = update.effective_user.id
+    user_record = await get_user(user_id)
+    lang = user_record.get("language", "en") if user_record else "en"
 
     if update.callback_query:
         query = update.callback_query
         await query.answer()
         data = query.data
         logger.info(f"Callback data received: {data}")
-        if data == "date_today":
-            date_str = now.strftime("%Y-%m-%d")
-        elif data == "date_tomorrow":
-            date_str = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-        elif data == "date_in2days":
-            date_str = (now + timedelta(days=2)).strftime("%Y-%m-%d")
-        context.user_data["date"] = date_str
-        reply_func = query.edit_message_text
+
+        action, year, month, day = process_calendar_callback(data)
+
+        if action == "IGNORE":
+            return ASK_DATE
+
+        if action in ["NAV", "VIEW_MONTHS", "VIEW_YEARS"]:
+            view_mapping = {
+                "NAV": "days",
+                "VIEW_MONTHS": "months",
+                "VIEW_YEARS": "years",
+            }
+            view = view_mapping[action]
+            reply_markup = build_calendar_keyboard(year, month, lang, view=view)
+            await query.edit_message_reply_markup(reply_markup=reply_markup)
+            return ASK_DATE
+
+        if action == "DAY":
+            date_str = f"{year}-{month:02d}-{day:02d}"
+            context.user_data["date"] = date_str
+            reply_func = query.edit_message_text
+
     else:
         text = update.message.text.strip()
         logger.info(f"Text data received: {text}")
-        match = re.match(r"^(\d{1,2})-(\d{1,2})$", text)
-        if not match:
+        try:
+            date_str = parse_date(text, lang=lang)
+            context.user_data["date"] = date_str
+            reply_func = update.message.reply_text
+        except ValueError:
             logger.warning("Invalid date format entered.")
             msg = await get_text("new_invalid_date", user_id)
             await update.message.reply_text(msg)
             return ASK_DATE
-        day, month = match.group(1), match.group(2)
-        context.user_data["date"] = f"{now.year}-{month.zfill(2)}-{day.zfill(2)}"
-        reply_func = update.message.reply_text
 
     logger.info(f"Date set to: {context.user_data['date']}")
 
@@ -508,7 +514,7 @@ conv_handler = ConversationHandler(
     states={
         ASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_date)],
         ASK_DATE: [
-            CallbackQueryHandler(process_date, pattern="^date_"),
+            CallbackQueryHandler(process_date, pattern="^cal:"),
             MessageHandler(filters.TEXT & ~filters.COMMAND, process_date),
         ],
         ASK_TIME: [
