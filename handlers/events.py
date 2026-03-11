@@ -119,8 +119,10 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"Regex matched: title='{title}', date='{date_str_raw}', time='{time_str}', duration='{duration_iso}', target='{calendar_target}'"
     )
 
+    lang = user_record.get("language", "en") if user_record else "en"
+
     try:
-        date_str = parse_date(date_str_raw)
+        date_str = parse_date(date_str_raw, lang=lang)
     except ValueError as e:
         logger.error(f"Error parsing date: {e}")
         msg = await get_text("add_invalid_datetime", user_id)

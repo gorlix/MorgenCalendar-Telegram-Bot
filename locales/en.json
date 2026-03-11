@@ -74,5 +74,14 @@
     "logout_btn_confirm": "Yes, logout",
     "logout_btn_cancel": "Cancel",
     "logout_success": "✅ You have been logged out. All local data has been deleted.",
-    "logout_cancelled": "Logout cancelled."
+    "logout_cancelled": "Logout cancelled.",
+    "date_today": "today",
+    "date_tomorrow": "tomorrow",
+    "date_monday": "monday",
+    "date_tuesday": "tuesday",
+    "date_wednesday": "wednesday",
+    "date_thursday": "thursday",
+    "date_friday": "friday",
+    "date_saturday": "saturday",
+    "date_sunday": "sunday"
 }

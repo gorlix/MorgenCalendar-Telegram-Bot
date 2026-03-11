@@ -2,8 +2,12 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional
 
+from i18n import get_text_sync
 
-def parse_date(date_str: str, current_date: Optional[datetime] = None) -> str:
+
+def parse_date(
+    date_str: str, current_date: Optional[datetime] = None, lang: str = "en"
+) -> str:
     """
     Parses a natural language date string into a 'YYYY-MM-DD' format.
 
@@ -16,6 +20,7 @@ def parse_date(date_str: str, current_date: Optional[datetime] = None) -> str:
     Args:
         date_str (str): The date string to parse.
         current_date (Optional[datetime]): The reference date. Defaults to datetime.now().
+        lang (str): The user's language code from their profile setting.
 
     Returns:
         str: The resolved date in 'YYYY-MM-DD' format.
@@ -28,20 +33,24 @@ def parse_date(date_str: str, current_date: Optional[datetime] = None) -> str:
 
     date_str_lower = date_str.strip().lower()
 
-    if date_str_lower == "today":
+    if date_str_lower == get_text_sync("date_today", lang).lower():
         return current_date.strftime("%Y-%m-%d")
 
-    if date_str_lower == "tomorrow":
+    if date_str_lower == get_text_sync("date_tomorrow", lang).lower():
         return (current_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
+    weekdays_keys = [
+        "date_monday",
+        "date_tuesday",
+        "date_wednesday",
+        "date_thursday",
+        "date_friday",
+        "date_saturday",
+        "date_sunday",
+    ]
+
     weekdays = {
-        "monday": 0,
-        "tuesday": 1,
-        "wednesday": 2,
-        "thursday": 3,
-        "friday": 4,
-        "saturday": 5,
-        "sunday": 6,
+        get_text_sync(key, lang).lower(): i for i, key in enumerate(weekdays_keys)
     }
 
     if date_str_lower in weekdays:

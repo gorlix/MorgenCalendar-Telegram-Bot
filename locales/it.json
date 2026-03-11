@@ -74,5 +74,14 @@
     "logout_btn_confirm": "Sì, logout",
     "logout_btn_cancel": "Annulla",
     "logout_success": "✅ Sei uscito con successo. Tutti i dati locali sono stati eliminati.",
-    "logout_cancelled": "Logout annullato."
+    "logout_cancelled": "Logout annullato.",
+    "date_today": "oggi",
+    "date_tomorrow": "domani",
+    "date_monday": "lunedì",
+    "date_tuesday": "martedì",
+    "date_wednesday": "mercoledì",
+    "date_thursday": "giovedì",
+    "date_friday": "venerdì",
+    "date_saturday": "sabato",
+    "date_sunday": "domenica"
 }
