@@ -1,3 +1,4 @@
+import re
 import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
 
@@ -79,7 +80,12 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     end_str = end_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     user_record = await get_user(user_id)
-    api_key = user_record["morgen_api_key"]
+    api_key = user_record.get("morgen_api_key") if user_record else None
+
+    if not api_key:
+        msg = await get_text("agenda_please_link", user_id)
+        await query.edit_message_text(msg)
+        return
 
     msg = await get_text("agenda_fetching", user_id, day=day_label)
     await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN)
@@ -95,7 +101,6 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN_V2)
 
     except RateLimitError as e:
-        import re
 
         match = re.search(r"wait (\d+) seconds", str(e))
         if match:

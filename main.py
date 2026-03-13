@@ -9,7 +9,12 @@ from telegram.ext import (
 )
 
 from database import init_db, get_users_with_agenda
-from handlers.basic import version_cmd, quick_event_callback, onboarding_conv_handler
+from handlers.basic import (
+    version_cmd,
+    quick_event_callback,
+    onboarding_conv_handler,
+    start,
+)
 from handlers.events import add_event, conv_handler, list_calendars_cmd
 from handlers.agenda import agenda_cmd, agenda_callback
 from handlers.settings import master_settings_conv_handler, logout_conv_handler
@@ -43,6 +48,7 @@ def main() -> None:
 
     # Basic handlers
     application.add_handler(onboarding_conv_handler)
+    application.add_handler(CommandHandler("help", start))
     application.add_handler(CommandHandler("version", version_cmd))
     application.add_handler(
         CallbackQueryHandler(quick_event_callback, pattern="^dashboard_quick$")
