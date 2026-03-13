@@ -1,7 +1,11 @@
 import os
 from typing import Optional, List, Dict, Any
+import logging
 
 import aiosqlite
+from utils.encryption import encrypt_key, decrypt_key, EncryptionError
+
+logger = logging.getLogger(__name__)
 
 DB_PATH: str = os.getenv("DB_PATH", "morgen_bot.db")
 
@@ -87,7 +91,18 @@ async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
         ) as cursor:
             row = await cursor.fetchone()
             if row:
-                return dict(row)
+                user_dict = dict(row)
+                if user_dict.get("morgen_api_key"):
+                    try:
+                        user_dict["morgen_api_key"] = decrypt_key(
+                            user_dict["morgen_api_key"]
+                        )
+                    except EncryptionError:
+                        logger.warning(
+                            f"Failed to decrypt API key for user {telegram_user_id}. Key might be plain-text or corrupted."
+                        )
+                        user_dict["morgen_api_key"] = None
+                return user_dict
             return None
 
 
@@ -118,6 +133,15 @@ async def upsert_user(
     """
     user = await get_user(telegram_user_id)
 
+    # Encrypt API key if provided
+    encrypted_key = None
+    if morgen_api_key:
+        try:
+            encrypted_key = encrypt_key(morgen_api_key)
+        except EncryptionError as e:
+            logger.error(f"Failed to encrypt API key for user {telegram_user_id}: {e}")
+            raise
+
     async with aiosqlite.connect(DB_PATH) as db:
         if not user:
             # Insert a new user
@@ -130,7 +154,7 @@ async def upsert_user(
                 """,
                 (
                     telegram_user_id,
-                    morgen_api_key,
+                    encrypted_key,
                     timezone or "UTC",
                     1 if daily_summary_enabled else 0,
                     language or "en",
@@ -147,7 +171,7 @@ async def upsert_user(
 
             if morgen_api_key is not None:
                 query += "morgen_api_key = ?, "
-                params.append(morgen_api_key)
+                params.append(encrypted_key)
             if timezone is not None:
                 query += "timezone = ?, "
                 params.append(timezone)
@@ -194,7 +218,17 @@ async def get_users_for_daily_summary() -> List[Dict[str, Any]]:
             "SELECT * FROM users WHERE daily_summary_enabled = 1 AND morgen_api_key IS NOT NULL"
         ) as cursor:
             rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+            users = []
+            for row in rows:
+                user_dict = dict(row)
+                try:
+                    user_dict["morgen_api_key"] = decrypt_key(
+                        user_dict["morgen_api_key"]
+                    )
+                    users.append(user_dict)
+                except EncryptionError:
+                    continue
+            return users
 
 
 async def get_users_with_agenda() -> List[Dict[str, Any]]:
@@ -208,7 +242,21 @@ async def get_users_with_agenda() -> List[Dict[str, Any]]:
             "SELECT * FROM users WHERE agenda_enabled = 1 AND morgen_api_key IS NOT NULL"
         ) as cursor:
             rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+            users = []
+            for row in rows:
+                user_dict = dict(row)
+                try:
+                    user_dict["morgen_api_key"] = decrypt_key(
+                        user_dict["morgen_api_key"]
+                    )
+                    users.append(user_dict)
+                except EncryptionError:
+                    logger.warning(
+                        f"Failed to decrypt API key for user {user_dict['telegram_user_id']}. Skipping summary."
+                    )
+                    # We skip users with failed decryption for background tasks
+                    continue
+            return users
 
 
 async def delete_user(telegram_user_id: int) -> None:
