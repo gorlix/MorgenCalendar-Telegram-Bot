@@ -2,9 +2,7 @@ version: "3.8"
 
 services:
   bot:
-    build:
-      context: .
-    image: morgen-bot-local:latest
+    image: ghcr.io/gorlix/morgencalendar-telegram-bot:latest
     container_name: morgen_bot
     restart: unless-stopped
     network_mode: host
