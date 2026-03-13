@@ -99,7 +99,8 @@ async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
                         )
                     except EncryptionError:
                         logger.warning(
-                            f"Failed to decrypt API key for user {telegram_user_id}. Key might be plain-text or corrupted."
+                            f"Failed to decrypt API key for user {telegram_user_id}. "
+                            "Key might be plain-text or corrupted."
                         )
                         user_dict["morgen_api_key"] = None
                 return user_dict

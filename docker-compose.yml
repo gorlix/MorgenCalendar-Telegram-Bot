@@ -11,5 +11,6 @@ services:
     network_mode: host
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
     volumes:
       - ./data:/app/data
