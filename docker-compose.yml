@@ -4,7 +4,6 @@ services:
   bot:
     build:
       context: .
-      network: host
     image: morgen-bot-local:latest
     container_name: morgen_bot
     restart: unless-stopped
