@@ -106,6 +106,19 @@ async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
             return None
 
 
+async def _user_exists(telegram_user_id: int) -> bool:
+    """
+    Lightweight check for user existence without decrypting the API key.
+    Used internally by upsert_user to avoid unnecessary cryptographic operations.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT 1 FROM users WHERE telegram_user_id = ? LIMIT 1",
+            (telegram_user_id,),
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
+
 async def upsert_user(
     telegram_user_id: int,
     morgen_api_key: Optional[str] = None,
@@ -131,7 +144,7 @@ async def upsert_user(
         default_calendar_id (Optional[str]): User preference for default calendar ID.
         default_account_id (Optional[str]): Account ID associated with the default calendar.
     """
-    user = await get_user(telegram_user_id)
+    exists = await _user_exists(telegram_user_id)
 
     # Encrypt API key if provided
     encrypted_key = None
@@ -143,7 +156,7 @@ async def upsert_user(
             raise
 
     async with aiosqlite.connect(DB_PATH) as db:
-        if not user:
+        if not exists:
             # Insert a new user
             await db.execute(
                 """

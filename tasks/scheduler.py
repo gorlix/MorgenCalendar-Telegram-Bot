@@ -1,3 +1,4 @@
+import re
 import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
 
@@ -55,7 +56,6 @@ async def send_daily_summaries(context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
     except RateLimitError as e:
-        import re
 
         match = re.search(r"wait (\d+) seconds", str(e))
         if match:

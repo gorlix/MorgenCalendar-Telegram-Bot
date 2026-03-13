@@ -134,7 +134,7 @@ class MorgenClient:
             "timeZone": timezone,
             "showWithoutTime": False,
         }
-        logger.info(f"CREATE EVENT PAYLOAD: {payload}")
+        logger.debug(f"CREATE EVENT PAYLOAD: {payload}")
 
         response = await self.client.post(
             url, headers=self._auth_headers(api_key), json=payload
@@ -257,7 +257,7 @@ class MorgenClient:
                         response_events = data.get("data", {}).get("events", [])
 
                         for ev in response_events:
-                            print(f"DEBUG RAW EVENT: {ev}")
+
                             title = ev.get("title") or ""
                             if (
                                 not title

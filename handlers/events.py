@@ -265,7 +265,9 @@ async def new_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(msg)
         return ConversationHandler.END
 
-    context.user_data["api_key"] = user_record["morgen_api_key"]
+    # NOTE: We intentionally do NOT store the decrypted API key in
+    # context.user_data to minimize the in-memory exposure window.
+    # Each step that needs it will call get_user() fresh.
     title_msg = await get_text("new_ask_title", user_id)
 
     if update.callback_query:
@@ -391,7 +393,14 @@ async def process_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     context.user_data["time"] = time_str
 
-    api_key = context.user_data["api_key"]
+    # Fetch decrypted API key fresh — minimizes in-memory exposure
+    user_record = await get_user(user_id)
+    api_key = user_record.get("morgen_api_key") if user_record else None
+    if not api_key:
+        msg = await get_text("new_please_link", user_id)
+        await reply_func(msg)
+        return ConversationHandler.END
+
     try:
         logger.info("Fetching calendars...")
         calendars = await morgen_client.list_calendars(api_key)
@@ -449,7 +458,14 @@ async def process_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     title = context.user_data["title"]
     date_str = context.user_data["date"]
     time_str = context.user_data["time"]
-    api_key = context.user_data["api_key"]
+
+    # Fetch decrypted API key fresh — minimizes in-memory exposure
+    user_record = await get_user(user_id)
+    api_key = user_record.get("morgen_api_key") if user_record else None
+    if not api_key:
+        msg = await get_text("new_please_link", user_id)
+        await query.edit_message_text(msg)
+        return ConversationHandler.END
 
     logger.info(f"Selected calendar index {idx}: {selected_cal.get('name')}")
 
