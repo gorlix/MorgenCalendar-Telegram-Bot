@@ -261,10 +261,11 @@ class MorgenClient:
                 # from the daily summary.  See: fix/missing-events-selected-guard.
 
                 cal_id = cal.get("id")
-                if "name" in cal:
-                    cal_map[cal_id] = cal["name"]
-                else:
-                    cal_map[cal_id] = "Unknown Calendar"
+                morgen_metadata = cal.get("morgen.so:metadata", {})
+                display_name = morgen_metadata.get("overrideName") or cal.get(
+                    "name", "Unknown Calendar"
+                )
+                cal_map[cal_id] = display_name
 
                 acc_id = cal.get("accountId")
                 if acc_id and cal_id:

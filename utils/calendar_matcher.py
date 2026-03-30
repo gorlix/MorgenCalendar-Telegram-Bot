@@ -32,8 +32,11 @@ def match_calendar(
     # Fallback to keyword matching
     target_lower = target.lower()
     for cal in calendars:
-        name = cal.get("name", "")
-        if target_lower in name.lower():
+        morgen_metadata = cal.get("morgen.so:metadata", {})
+        display_name = morgen_metadata.get("overrideName") or cal.get(
+            "name", "Unknown Calendar"
+        )
+        if target_lower in display_name.lower():
             return cal
 
     return None

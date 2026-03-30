@@ -216,7 +216,11 @@ async def send_calendar_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ):
             cal_id = cal.get("id")
             acc_id = cal.get("accountId")
-            name = cal.get("name", "Unknown")
+
+            morgen_metadata = cal.get("morgen.so:metadata", {})
+            name = morgen_metadata.get("overrideName") or cal.get(
+                "name", "Unknown Calendar"
+            )
 
             if "settings_calendars" not in context.user_data:
                 context.user_data["settings_calendars"] = []
