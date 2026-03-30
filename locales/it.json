@@ -20,7 +20,7 @@
     "agenda_rate_limit": "⚠️ Limite Rate API di Morgen superato. I tuoi punti verranno ripristinati tra {time_str}. Riprova tra poco.",
     "agenda_error": "❌ Impossibile recuperare l'agenda.",
     "agenda_header": "📅 *Agenda per {day}*\n\n",
-    "agenda_empty": "Rilassati! Nessun evento in programma.",
+    "agenda_empty": "☀️Rilassati!\n Nessun evento in programma.\n",
     "agenda_all_day_header": "*Eventi per tutto il giorno:*\n",
     "daily_summary_header": "🌅 *Buongiorno\\! Ecco la tua agenda per oggi:*\n\n",
     "daily_summary_empty": "Nessun evento in programma. Buona giornata!",
