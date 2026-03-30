@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 
-from utils.encryption import encrypt_key, decrypt_key, EncryptionError
+from utils.encryption import EncryptionError, decrypt_key, encrypt_key
 
 
 class TestEncryptionUtility(unittest.TestCase):
@@ -90,7 +90,7 @@ class TestDatabaseEncryptionIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_upsert_stores_encrypted_get_returns_decrypted(self):
         """API key must be encrypted in DB and transparently decrypted by get_user."""
-        from database import upsert_user, get_user
+        from database import get_user, upsert_user
 
         user_id = 99999
         api_key = "morgen_secret_api_key"
@@ -104,6 +104,7 @@ class TestDatabaseEncryptionIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_raw_db_value_is_not_plaintext(self):
         """The value stored in SQLite must NOT be the plain-text API key."""
         import aiosqlite
+
         from database import upsert_user
 
         user_id = 88888
@@ -111,13 +112,15 @@ class TestDatabaseEncryptionIntegration(unittest.IsolatedAsyncioTestCase):
 
         await upsert_user(user_id, morgen_api_key=api_key)
 
-        async with aiosqlite.connect(self.test_db) as db:
-            async with db.execute(
+        async with (
+            aiosqlite.connect(self.test_db) as db,
+            db.execute(
                 "SELECT morgen_api_key FROM users WHERE telegram_user_id = ?",
                 (user_id,),
-            ) as cursor:
-                row = await cursor.fetchone()
-                raw_value = row[0]
+            ) as cursor,
+        ):
+            row = await cursor.fetchone()
+            raw_value = row[0]
 
         self.assertNotEqual(raw_value, api_key)
         self.assertIsNotNone(raw_value)
@@ -125,6 +128,7 @@ class TestDatabaseEncryptionIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_graceful_failover_returns_none_for_bad_key(self):
         """If decryption fails (e.g. old plain-text key), get_user returns None for the key."""
         import aiosqlite
+
         from database import get_user
 
         user_id = 77777

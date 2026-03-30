@@ -1,15 +1,15 @@
-import re
-import logging
-from datetime import datetime, timedelta, timezone as dt_timezone
-
-from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
 import datetime as dt
+import logging
+import re
+from datetime import datetime, timedelta
+
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
 from database import get_user
-from morgen_client import MorgenClient, RateLimitError
 from formatters import format_daily_summary
 from i18n import get_text
+from morgen_client import MorgenClient, RateLimitError
 
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
@@ -38,7 +38,7 @@ async def send_daily_summaries(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     api_key = user_record["morgen_api_key"]
 
-    now = datetime.now(dt_timezone.utc)
+    now = datetime.now(dt.UTC)
     start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=1)
 
@@ -56,7 +56,6 @@ async def send_daily_summaries(context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
     except RateLimitError as e:
-
         match = re.search(r"wait (\d+) seconds", str(e))
         if match:
             seconds = int(match.group(1))

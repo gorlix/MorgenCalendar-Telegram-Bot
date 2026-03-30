@@ -1,23 +1,23 @@
-import os
-import logging
 import asyncio
+import logging
+import os
 
 from telegram.ext import (
     ApplicationBuilder,
-    CommandHandler,
     CallbackQueryHandler,
+    CommandHandler,
 )
 
-from database import init_db, get_users_with_agenda
+from database import get_users_with_agenda, init_db
+from handlers.agenda import agenda_callback, agenda_cmd
 from handlers.basic import (
-    version_cmd,
-    quick_event_callback,
     onboarding_conv_handler,
+    quick_event_callback,
     start,
+    version_cmd,
 )
 from handlers.events import add_event, conv_handler, list_calendars_cmd
-from handlers.agenda import agenda_cmd, agenda_callback
-from handlers.settings import master_settings_conv_handler, logout_conv_handler
+from handlers.settings import logout_conv_handler, master_settings_conv_handler
 from tasks.scheduler import update_user_agenda_job
 
 # Enable logging

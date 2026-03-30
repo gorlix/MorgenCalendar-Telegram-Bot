@@ -1,8 +1,9 @@
-import re
-from typing import List, Dict, Any
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 import html
+import re
+from datetime import datetime, timedelta
+from typing import Any
+from zoneinfo import ZoneInfo
+
 from i18n import get_text_sync
 
 
@@ -21,7 +22,7 @@ def escape_markdown_v2(text: str) -> str:
     return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", text)
 
 
-def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
+def format_single_event(event: dict[str, Any], lang: str = "en") -> str:
     """
     Formats a single Morgen event dictionary into a MarkdownV2 list item.
 
@@ -102,7 +103,7 @@ def format_single_event(event: Dict[str, Any], lang: str = "en") -> str:
     return f"\\- `{escaped_time}` {escaped_cal} \\- {escaped_title}"
 
 
-def build_event_list_text(events: List[Dict[str, Any]], lang: str = "en") -> str:
+def build_event_list_text(events: list[dict[str, Any]], lang: str = "en") -> str:
     if not events:
         return ""
 
@@ -139,7 +140,7 @@ def build_event_list_text(events: List[Dict[str, Any]], lang: str = "en") -> str
 
 
 def format_agenda_message(
-    events: List[Dict[str, Any]], day_label: str, user_id: int, lang: str = "en"
+    events: list[dict[str, Any]], day_label: str, user_id: int, lang: str = "en"
 ) -> str:
     """
     Formats a list of events into a Telegram MarkdownV2 agenda message.
@@ -163,7 +164,7 @@ def format_agenda_message(
     return msg
 
 
-def format_daily_summary(events: List[Dict[str, Any]], lang: str = "en") -> str:
+def format_daily_summary(events: list[dict[str, Any]], lang: str = "en") -> str:
     """
     Formats a list of events into a Telegram MarkdownV2 daily summary message.
 

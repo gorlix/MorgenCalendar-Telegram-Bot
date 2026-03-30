@@ -1,10 +1,28 @@
 repos:
--   repo: https://github.com/psf/black
-    rev: 24.2.0
+  # Ruff: replaces both black (formatting) and flake8 (linting) in a single,
+  # ultra-fast tool written in Rust. The two hooks are kept separate so that
+  # formatting and lint errors produce distinct, actionable output.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.8
     hooks:
-    -   id: black
--   repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
+      # ruff-format: replaces black — applies opinionated, deterministic formatting.
+      # Must run BEFORE the linter so the linter sees the final formatted source.
+      - id: ruff-format
+      # ruff: replaces flake8 — runs all enabled lint rules and applies safe
+      # auto-fixes (--fix-only) so the commit is left in a clean state.
+      - id: ruff
+        args: [--fix-only]
+
+  # Mypy: static type checker. Establishes a type-safety baseline for the
+  # project without requiring complete annotation coverage on day one.
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
     hooks:
-    -   id: flake8
-        args: [--max-line-length=88, "--extend-ignore=E203,E501"]
+      - id: mypy
+        additional_dependencies:
+          # Provide inline type stubs for third-party libraries that ship their
+          # own py.typed marker or are in typeshed, so mypy can resolve them.
+          - httpx
+          - python-telegram-bot
+          - aiosqlite
+          - cryptography

@@ -1,9 +1,9 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def match_calendar(
-    calendars: List[Dict[str, Any]], target: str
-) -> Optional[Dict[str, Any]]:
+    calendars: list[dict[str, Any]], target: str
+) -> dict[str, Any] | None:
     """
     Finds a target calendar based on a user-provided string.
 

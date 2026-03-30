@@ -1,7 +1,8 @@
-import logging
-import httpx
 import asyncio
-from typing import Dict, Any, List, Optional
+import logging
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class MorgenClient:
             timeout=15.0, transport=transport
         )
 
-    def _auth_headers(self, api_key: str) -> Dict[str, str]:
+    def _auth_headers(self, api_key: str) -> dict[str, str]:
         """
         Generate the required authorization headers.
 
@@ -42,7 +43,7 @@ class MorgenClient:
         """
         return {"accept": "application/json", "Authorization": f"ApiKey {api_key}"}
 
-    async def list_calendars(self, api_key: str) -> List[Dict[str, Any]]:
+    async def list_calendars(self, api_key: str) -> list[dict[str, Any]]:
         """
         Fetch all calendars associated with the user's Morgen account.
 
@@ -60,8 +61,8 @@ class MorgenClient:
         return data.get("data", {}).get("calendars", [])
 
     async def get_primary_calendar(
-        self, api_key: str, preferred_calendar_id: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, api_key: str, preferred_calendar_id: str | None = None
+    ) -> dict[str, Any] | None:
         """
         Identify the primary calendar to use.
         If a preferred_calendar_id is given and it is writable, it returns it.
@@ -108,7 +109,7 @@ class MorgenClient:
         start_datetime_iso: str,
         duration_iso: str,
         timezone: str = "UTC",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a new calendar event.
 
@@ -154,7 +155,7 @@ class MorgenClient:
         self,
         api_key: str,
         account_id: str,
-        calendar_ids: List[str],
+        calendar_ids: list[str],
         start_datetime: str,
         end_datetime: str,
     ) -> httpx.Response:
@@ -190,7 +191,7 @@ class MorgenClient:
 
     async def get_all_events(
         self, api_key: str, start_datetime: str, end_datetime: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch events in batches from ALL calendars available on the user's Morgen
         account, regardless of their visibility state in the Morgen UI.
@@ -301,7 +302,6 @@ class MorgenClient:
                         response_events = data.get("data", {}).get("events", [])
 
                         for ev in response_events:
-
                             title = ev.get("title") or ""
                             if (
                                 not title

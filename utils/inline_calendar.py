@@ -1,5 +1,5 @@
 import calendar
-from typing import Tuple, Optional
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from i18n import get_text_sync
@@ -163,7 +163,7 @@ def build_calendar_keyboard(
 
 def process_calendar_callback(
     callback_data: str,
-) -> Tuple[str, Optional[int], Optional[int], Optional[int]]:
+) -> tuple[str, int | None, int | None, int | None]:
     """
     Parses the inline calendar callback data.
 
