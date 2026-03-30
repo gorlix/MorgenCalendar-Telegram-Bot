@@ -192,16 +192,54 @@ class MorgenClient:
         self, api_key: str, start_datetime: str, end_datetime: str
     ) -> List[Dict[str, Any]]:
         """
-        Fetch events in batches from all available user calendars to avoid rate limits
-        and URL length constraints.
+        Fetch events in batches from ALL calendars available on the user's Morgen
+        account, regardless of their visibility state in the Morgen UI.
+
+        Design note — intentional fetch-all behaviour:
+            Morgen calendar objects carry a ``selected`` boolean that reflects
+            whether the calendar is currently visible/active inside the Morgen
+            desktop/mobile app.  A previous iteration of this method skipped
+            calendars where ``selected is False``, which caused events from
+            secondary or hidden calendars (e.g. a medical appointment calendar
+            that a user had toggled off in the UI) to be silently dropped from
+            the daily summary without any error or warning.
+
+            Because this bot is a background notification service, it must
+            present a *complete* picture of the user's schedule.  A calendar
+            that is hidden in the Morgen app UI is not necessarily unimportant
+            — the user may simply prefer a cleaner visual in the app while
+            still needing to be reminded of its events.  Silently omitting
+            those events would constitute data loss from the bot's perspective.
+
+            The ``selected`` field is therefore intentionally disregarded here.
+            If calendar exclusion is needed in the future, it should be
+            implemented via an explicit bot-side configuration (see TODO below).
+
+        Pagination & rate-limit strategy:
+            Calendars are grouped by ``accountId`` and further split into
+            batches of up to 5 IDs per API request to stay within Morgen\'s
+            URL-length and rate-limit constraints.  A 0.5-second sleep is
+            inserted between batches.  On a 429 response the error is surfaced
+            as a :class:`RateLimitError` so callers can notify the user.
 
         Args:
             api_key (str): The user's Morgen API key.
-            start_datetime (str): Datetime string with timezone (e.g. "2023-03-01T00:00:00Z").
-            end_datetime (str): Datetime string with timezone (e.g. "2023-03-02T00:00:00Z").
+            start_datetime (str): ISO-8601 datetime with UTC offset
+                (e.g. ``"2023-03-01T00:00:00Z"``).  Defines the inclusive
+                start of the query window.
+            end_datetime (str): ISO-8601 datetime with UTC offset
+                (e.g. ``"2023-03-02T00:00:00Z"``).  Defines the exclusive
+                end of the query window.
 
         Returns:
-            List[Dict[str, Any]]: A flattened, sorted list of all events from all accessible calendars.
+            List[Dict[str, Any]]: A flattened list of event dictionaries,
+            sorted chronologically by ``start``.  Each entry is augmented
+            with a ``calendar_name`` key derived from the calendar list.
+            Events with no title, a blank title, or the literal title
+            ``"Busy"`` are filtered out before returning.
+
+        Raises:
+            RateLimitError: If the Morgen API returns HTTP 429 (rate limited).
         """
         try:
             calendars = await self.list_calendars(api_key)
@@ -212,8 +250,14 @@ class MorgenClient:
             account_map = {}
             cal_map = {}
             for cal in calendars:
-                if cal.get("selected") is False:
-                    continue
+                # TODO: Implement a proper calendar exclusion feature based on a
+                # bot-level configuration (e.g. a per-user blacklist of specific
+                # calendar IDs stored in the database) rather than relying on the
+                # Morgen API "selected" UI-visibility flag.  Filtering on
+                # `selected` caused silent data loss: events from calendars
+                # hidden in the Morgen app were dropped with no error or log
+                # message, making important appointments (e.g. medical) disappear
+                # from the daily summary.  See: fix/missing-events-selected-guard.
 
                 cal_id = cal.get("id")
                 if "name" in cal:
