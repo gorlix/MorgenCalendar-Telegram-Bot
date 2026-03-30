@@ -4,29 +4,28 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Permette l'avvio manuale dalla scheda Actions
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+          cache: 'pip'
 
-      - name: Install Linting Tools
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8==7.0.0 black==24.2.0
+          pip install pre-commit
 
-      - name: Check Formatting with Black
-        run: black --check .
-
-      - name: Lint with Flake8
-        run: flake8 . --max-line-length=120
+      - name: Run pre-commit (Ruff & Mypy)
+        run: pre-commit run --all-files
 
   deploy:
     runs-on: ubuntu-latest
@@ -36,7 +35,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set Version Variable
         id: version
@@ -64,12 +63,23 @@ jobs:
         with:
           images: ghcr.io/${{ env.REPO_LOWERCASE }}
 
+      - name: Determine Docker Tags
+        id: docker_tags
+        run: |
+          # Assegna sempre il tag con la versione (per i test sui branch)
+          TAGS="ghcr.io/${{ env.REPO_LOWERCASE }}:${{ env.APP_VERSION }}"
+          
+          # Se il workflow gira su main, aggiunge anche il tag latest
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            TAGS="$TAGS,ghcr.io/${{ env.REPO_LOWERCASE }}:latest"
+          fi
+          
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ env.REPO_LOWERCASE }}:latest
-            ghcr.io/${{ env.REPO_LOWERCASE }}:${{ env.APP_VERSION }}
+          tags: ${{ steps.docker_tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
