@@ -10,23 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+          cache: 'pip'
 
-      - name: Install Linting Tools
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8==7.0.0 black==24.2.0
+          pip install pre-commit
 
-      - name: Check Formatting with Black
-        run: black --check .
-
-      - name: Lint with Flake8
-        run: flake8 . --max-line-length=120
+      - name: Run pre-commit (Ruff & Mypy)
+        run: pre-commit run --all-files
 
   deploy:
     runs-on: ubuntu-latest
@@ -36,7 +34,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set Version Variable
         id: version
