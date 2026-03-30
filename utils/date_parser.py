@@ -1,12 +1,11 @@
 import re
 from datetime import datetime, timedelta
-from typing import Optional
 
 from i18n import get_text_sync
 
 
 def parse_date(
-    date_str: str, current_date: Optional[datetime] = None, lang: str = "en"
+    date_str: str, current_date: datetime | None = None, lang: str = "en"
 ) -> str:
     """
     Parses a natural language date string into a 'YYYY-MM-DD' format.

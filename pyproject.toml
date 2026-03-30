@@ -1,0 +1,143 @@
+# =============================================================================
+# pyproject.toml — MorgenCalendar Telegram Bot
+# =============================================================================
+# Centralised project metadata and tool configuration.
+# This file is the single source of truth for linter, formatter, and type
+# checker settings, replacing the now-deleted .flake8 config file.
+# =============================================================================
+
+[project]
+name = "morgen-calendar-telegram-bot"
+version = "1.0.0"
+description = "A Telegram bot that delivers daily calendar summaries from Morgen Calendar."
+readme = "README.md"
+requires-python = ">=3.12"
+
+# =============================================================================
+# Ruff — replaces black (formatting) and flake8 (linting)
+# Docs: https://docs.astral.sh/ruff/
+# =============================================================================
+
+[tool.ruff]
+# Match Black's historical default so diffs are minimal on first run.
+line-length = 88
+
+# Target the minimum Python version supported by this project.
+# (Runtime is 3.14, but we set a conservative floor for portability.)
+target-version = "py312"
+
+# Directories that should never be linted or formatted.
+exclude = [
+    ".venv",
+    "venv",
+    "env",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# Rule sets enabled:
+#   E / W — pycodestyle errors and warnings (flake8 core)
+#   F     — Pyflakes (unused imports, undefined names, etc.)
+#   I     — isort (import ordering) — replaces a separate isort hook
+#   UP    — pyupgrade (modernise Python syntax automatically)
+#   B     — flake8-bugbear (likely bugs and design problems)
+#   SIM   — flake8-simplify (suggest simpler code constructs)
+select = ["E", "W", "F", "I", "UP", "B", "SIM"]
+
+# Exceptions ported from the old .flake8 / inline noqa comments:
+#   E203 — whitespace before ':' (conflicts with Black/ruff-format slice style)
+#   E501 — line too long (ruff-format enforces line length; the linter defers)
+#   B008 — do not perform function calls in default arguments (common in PTB)
+ignore = ["E203", "E501", "B008"]
+
+# Allow unused imports in __init__.py re-export files.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+# =============================================================================
+# Mypy — static type checker
+# Docs: https://mypy.readthedocs.io/
+# =============================================================================
+
+[tool.mypy]
+# Target the same Python version floor used by Ruff.
+python_version = "3.12"
+
+# Suppress errors caused by third-party libraries that lack type stubs or a
+# py.typed marker.  This is the correct baseline posture when introducing mypy
+# to an existing codebase: get it passing first, then tighten incrementally.
+ignore_missing_imports = true
+
+# Warn about functions that return Any implicitly, which can mask type errors.
+# Kept false at baseline: the codebase uses json/dict returns typed as Any which
+# would produce pervasive no-any-return noise.  Enable progressively.
+warn_return_any = false
+
+# Ensure that all code paths in a typed function have explicit return statements.
+warn_no_return = true
+
+# Disallow using Any in type annotations where a more precise type could be given.
+# Kept at false for now to ease the initial migration; enable progressively.
+disallow_any_generics = false
+
+# Show column numbers in error messages for easier editor navigation.
+show_column_numbers = true
+
+# ---------------------------------------------------------------------------
+# Baseline suppressions — errors intrinsic to the python-telegram-bot API
+# ---------------------------------------------------------------------------
+# python-telegram-bot exposes update.effective_user, update.message,
+# update.callback_query etc. as Optional[T], meaning mypy flags every access
+# such as  update.message.reply_text()  as a potential [union-attr] error.
+# At runtime these are always non-None inside their respective handler paths,
+# but teaching mypy about every guard would require rewriting all handlers.
+# Suppressed globally at baseline; tighten per-file as handlers are refactored.
+disable_error_code = ["union-attr"]
+
+# Exclude virtual environments and generated artefacts from type checking.
+exclude = [
+    "\\.venv",
+    "venv",
+    "build",
+    "dist",
+]
+
+# ---------------------------------------------------------------------------
+# Per-module overrides — remaining isolated errors that don't warrant a
+# global suppression.  Reviewed individually; see inline comments.
+# ---------------------------------------------------------------------------
+
+# morgen_client.py: one arg-type mismatch on the httpx params list (the
+# list[tuple[str,str]] form is valid at runtime but not in httpx's stub) and
+# one var-annotated on account_map.  Both are safe; suppress at baseline.
+[[tool.mypy.overrides]]
+module = "morgen_client"
+disable_error_code = ["arg-type", "var-annotated"]
+
+# tasks/scheduler.py: job.data is typed as `object` in PTB's JobQueue; the
+# .get() call is safe at runtime because we always pass a dict.  Suppress
+# attr-defined at baseline; fix properly when PTB generics are available.
+[[tool.mypy.overrides]]
+module = "tasks.scheduler"
+disable_error_code = ["attr-defined"]
+
+# handlers/events.py & handlers/settings.py:
+#   - [index] / [operator]: context.user_data is typed as `dict[Any,Any] | None`
+#     in PTB; handlers access it only after it is guaranteed to be populated.
+#   - [assignment]: the reply_func pattern (branching between .reply_text and
+#     .edit_message_text) produces an incompatible-types assignment because the
+#     two methods have distinct return signatures.
+#   - [arg-type]: calendar callback helpers expect non-Optional primitives.
+# All are safe at runtime; suppress at baseline and tighten during handler
+# refactors that add explicit None guards or typed wrappers.
+[[tool.mypy.overrides]]
+module = "handlers.events"
+disable_error_code = ["index", "operator", "assignment", "arg-type"]
+
+[[tool.mypy.overrides]]
+module = "handlers.settings"
+disable_error_code = ["index", "operator"]
+

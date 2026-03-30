@@ -1,9 +1,10 @@
-import os
-from typing import Optional, List, Dict, Any
 import logging
+import os
+from typing import Any
 
 import aiosqlite
-from utils.encryption import encrypt_key, decrypt_key, EncryptionError
+
+from utils.encryption import EncryptionError, decrypt_key, encrypt_key
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ async def init_db() -> None:
             pass  # Columns already exist
 
 
-async def get_user(telegram_user_id: int) -> Optional[Dict[str, Any]]:
+async def get_user(telegram_user_id: int) -> dict[str, Any] | None:
     """
     Retrieve a user from the database by their Telegram ID.
 
@@ -112,24 +113,26 @@ async def _user_exists(telegram_user_id: int) -> bool:
     Lightweight check for user existence without decrypting the API key.
     Used internally by upsert_user to avoid unnecessary cryptographic operations.
     """
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
+    async with (
+        aiosqlite.connect(DB_PATH) as db,
+        db.execute(
             "SELECT 1 FROM users WHERE telegram_user_id = ? LIMIT 1",
             (telegram_user_id,),
-        ) as cursor:
-            return await cursor.fetchone() is not None
+        ) as cursor,
+    ):
+        return await cursor.fetchone() is not None
 
 
 async def upsert_user(
     telegram_user_id: int,
-    morgen_api_key: Optional[str] = None,
-    timezone: Optional[str] = None,
-    daily_summary_enabled: Optional[bool] = None,
-    language: Optional[str] = None,
-    agenda_enabled: Optional[bool] = None,
-    agenda_time: Optional[str] = None,
-    default_calendar_id: Optional[str] = None,
-    default_account_id: Optional[str] = None,
+    morgen_api_key: str | None = None,
+    timezone: str | None = None,
+    daily_summary_enabled: bool | None = None,
+    language: str | None = None,
+    agenda_enabled: bool | None = None,
+    agenda_time: str | None = None,
+    default_calendar_id: str | None = None,
+    default_account_id: str | None = None,
 ) -> None:
     """
     Insert a new user or update an existing user's details.
@@ -181,7 +184,7 @@ async def upsert_user(
         else:
             # Update existing user, only overriding provided fields
             query = "UPDATE users SET "
-            params: List[Any] = []
+            params: list[Any] = []
 
             if morgen_api_key is not None:
                 query += "morgen_api_key = ?, "
@@ -218,7 +221,7 @@ async def upsert_user(
         await db.commit()
 
 
-async def get_users_for_daily_summary() -> List[Dict[str, Any]]:
+async def get_users_for_daily_summary() -> list[dict[str, Any]]:
     """
     Retrieve all users who have opted in for the daily summary.
 
@@ -245,7 +248,7 @@ async def get_users_for_daily_summary() -> List[Dict[str, Any]]:
             return users
 
 
-async def get_users_with_agenda() -> List[Dict[str, Any]]:
+async def get_users_with_agenda() -> list[dict[str, Any]]:
     """
     Retrieve all users who have `agenda_enabled` = 1
     Used for initializing per-user scheduler jobs.

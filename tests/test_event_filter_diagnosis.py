@@ -262,9 +262,9 @@ def test_selected_is_false_no_longer_excludes_calendar():
     )
     # Its events still get filtered by the title guard ('Busy' → discarded)
     titles = [ev["title"] for ev in events]
-    assert (
-        "Busy" not in titles
-    ), "The title-based 'Busy' filter must still discard CAL_HIDDEN's event."
+    assert "Busy" not in titles, (
+        "The title-based 'Busy' filter must still discard CAL_HIDDEN's event."
+    )
     print("PASS  test_selected_is_false_no_longer_excludes_calendar")
 
 
@@ -330,9 +330,9 @@ def test_chronological_ordering():
     """Events must be sorted by start time."""
     events, _, _, _ = simulate_get_all_events(MOCK_CALENDARS, MOCK_EVENTS_PER_CALENDAR)
     starts = [ev["start"] for ev in events]
-    assert starts == sorted(
-        starts
-    ), f"FAIL: Events are not chronologically sorted.\n  Got: {starts}"
+    assert starts == sorted(starts), (
+        f"FAIL: Events are not chronologically sorted.\n  Got: {starts}"
+    )
     print("PASS  test_chronological_ordering")
 
 

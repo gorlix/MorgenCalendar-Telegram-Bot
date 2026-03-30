@@ -1,15 +1,15 @@
-import re
 import logging
-from datetime import datetime, timedelta, timezone as dt_timezone
+import re
+from datetime import UTC, datetime, timedelta
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
 from database import get_user
-from morgen_client import MorgenClient, RateLimitError
 from formatters import format_agenda_message
 from i18n import get_text
+from morgen_client import MorgenClient, RateLimitError
 
 logger = logging.getLogger(__name__)
 morgen_client = MorgenClient()
@@ -60,7 +60,7 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
 
     action = query.data.split("_")[1]
-    now = datetime.now(dt_timezone.utc)
+    now = datetime.now(UTC)
     user_id = update.effective_user.id
 
     if action == "today":
@@ -101,7 +101,6 @@ async def agenda_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN_V2)
 
     except RateLimitError as e:
-
         match = re.search(r"wait (\d+) seconds", str(e))
         if match:
             seconds = int(match.group(1))

@@ -1,20 +1,21 @@
 import logging
 import re
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
+    CallbackQueryHandler,
+    CommandHandler,
     ContextTypes,
     ConversationHandler,
-    CommandHandler,
-    CallbackQueryHandler,
     MessageHandler,
     filters,
 )
-from telegram.constants import ParseMode
 
 from database import get_user, upsert_user
-from tasks.scheduler import update_user_agenda_job
-from morgen_client import MorgenClient
 from i18n import get_text
+from morgen_client import MorgenClient
+from tasks.scheduler import update_user_agenda_job
 
 logger = logging.getLogger(__name__)
 

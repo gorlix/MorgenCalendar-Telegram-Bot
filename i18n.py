@@ -17,7 +17,7 @@ def load_locales():
     for lang in ["en", "it"]:
         file_path = locales_dir / f"{lang}.json"
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 _locales[lang] = json.load(f)
         except Exception as e:
             logger.error(f"Failed to load locale {lang}: {e}")
