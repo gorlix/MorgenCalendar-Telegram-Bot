@@ -243,7 +243,10 @@ async def list_calendars_cmd(
 
     response = "🗓 *Available Calendars:*\n\n"
     for i, cal in enumerate(writable_cals, start=1):
-        name = cal.get("name", "Unknown")
+        morgen_metadata = cal.get("morgen.so:metadata", {})
+        name = morgen_metadata.get("overrideName") or cal.get(
+            "name", "Unknown Calendar"
+        )
         response += f"*{i}.* {name}\n"
 
     response += "\n_Use the number or name in the /add command!_"
@@ -419,7 +422,11 @@ async def process_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         ):
             cal_id = cal.get("id")
             acc_id = cal.get("accountId")
-            name = cal.get("name", "Unknown")
+
+            morgen_metadata = cal.get("morgen.so:metadata", {})
+            name = morgen_metadata.get("overrideName") or cal.get(
+                "name", "Unknown Calendar"
+            )
 
             if "calendars" not in context.user_data:
                 context.user_data["calendars"] = []
