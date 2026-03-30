@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Permette l'avvio manuale dalla scheda Actions
 
 jobs:
   lint-and-test:
@@ -62,12 +63,23 @@ jobs:
         with:
           images: ghcr.io/${{ env.REPO_LOWERCASE }}
 
+      - name: Determine Docker Tags
+        id: docker_tags
+        run: |
+          # Assegna sempre il tag con la versione (per i test sui branch)
+          TAGS="ghcr.io/${{ env.REPO_LOWERCASE }}:${{ env.APP_VERSION }}"
+          
+          # Se il workflow gira su main, aggiunge anche il tag latest
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            TAGS="$TAGS,ghcr.io/${{ env.REPO_LOWERCASE }}:latest"
+          fi
+          
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ env.REPO_LOWERCASE }}:latest
-            ghcr.io/${{ env.REPO_LOWERCASE }}:${{ env.APP_VERSION }}
+          tags: ${{ steps.docker_tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
