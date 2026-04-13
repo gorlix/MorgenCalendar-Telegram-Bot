@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -56,38 +57,49 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     api_key = user_record["morgen_api_key"]
 
+    # Strip prefix and split into tokens
     text = update.message.text.strip()
-    # /add <Title> <Date> <Time> [Remainder]
-    match = re.match(
-        r"^/add\s+(.+?)\s+([a-zA-Z0-9-]+)\s+(\d{1,2}:\d{2})(?:\s+(.+))?$",
-        text,
-    )
+    if text.startswith("/add"):
+        text = text[4:].strip()
 
-    if not match:
+    tokens = text.split()
+    if len(tokens) < 3:
         msg = await get_text("add_invalid_format", user_id)
-        await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+        docs = await get_text("add_docs", user_id)
+        await update.message.reply_text(msg + docs, parse_mode=ParseMode.MARKDOWN)
         return
 
-    title = match.group(1).strip()
-    date_str_raw = match.group(2).strip()
-    time_str = match.group(3).strip()
-    remainder = match.group(4)
+    # Find Time token (usually the first token matching HH:MM after position 1)
+    time_idx = -1
+    for i, token in enumerate(tokens):
+        if i >= 2 and re.match(r"^\d{1,2}:\d{2}$", token):
+            time_idx = i
+            break
+
+    if time_idx == -1:
+        msg = await get_text("add_err_time", user_id)
+        docs = await get_text("add_docs", user_id)
+        await update.message.reply_text(msg + docs, parse_mode=ParseMode.MARKDOWN)
+        return
+
+    title = " ".join(tokens[: time_idx - 1])
+    date_str_raw = tokens[time_idx - 1]
+    time_str = tokens[time_idx]
+    remainder_tokens = tokens[time_idx + 1 :]
 
     duration_iso = "PT1H"  # default
     calendar_target = None
 
-    if remainder:
-        remainder = remainder.strip()
-        parts = remainder.split(maxsplit=1)
-        first_part = parts[0].upper()
+    if remainder_tokens:
+        first_part = remainder_tokens[0].upper()
 
         # Strict regex for duration or end time (e.g. '1H', '30M', '15:30')
         if re.match(r"^\d+[HM]$", first_part) or re.match(
             r"^\d{1,2}:\d{2}$", first_part
         ):
             optional_arg = first_part
-            if len(parts) > 1:
-                calendar_target = parts[1].strip()
+            if len(remainder_tokens) > 1:
+                calendar_target = " ".join(remainder_tokens[1:])
 
             if ":" in optional_arg:
                 try:
@@ -114,10 +126,10 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 duration_iso = f"PT{optional_arg}"
         else:
             # First part is not a duration, so the entire remainder is the calendar target
-            calendar_target = remainder
+            calendar_target = " ".join(remainder_tokens)
 
     logger.debug(
-        f"Regex matched: title='{title}', date='{date_str_raw}', "
+        f"Parsed sequentially: title='{title}', date='{date_str_raw}', "
         f"time='{time_str}', duration='{duration_iso}', target='{calendar_target}'"
     )
 
@@ -127,16 +139,18 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         date_str = parse_date(date_str_raw, lang=lang)
     except ValueError as e:
         logger.error(f"Error parsing date: {e}")
-        msg = await get_text("add_invalid_datetime", user_id)
-        await update.message.reply_text(msg)
+        msg = await get_text("add_err_date", user_id)
+        docs = await get_text("add_docs", user_id)
+        await update.message.reply_text(msg + docs, parse_mode=ParseMode.MARKDOWN)
         return
 
     try:
         start_naive_iso = get_naive_iso_string(date_str, time_str)
         logger.debug(f"Constructed start datetime ISO: {start_naive_iso}")
     except ValueError:
-        msg = await get_text("add_invalid_datetime", user_id)
-        await update.message.reply_text(msg)
+        msg = await get_text("add_err_time", user_id)
+        docs = await get_text("add_docs", user_id)
+        await update.message.reply_text(msg + docs, parse_mode=ParseMode.MARKDOWN)
         return
 
     try:
@@ -164,6 +178,11 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     target_cal = None
     if calendar_target:
         target_cal = match_calendar(writable_cals, calendar_target)
+        if not target_cal:
+            msg = await get_text("add_err_cal", user_id, cal=calendar_target)
+            docs = await get_text("add_docs", user_id)
+            await update.message.reply_text(msg + docs, parse_mode=ParseMode.MARKDOWN)
+            return
 
     if not target_cal:
         preferred_cal_id = user_record.get("default_calendar_id")
@@ -198,6 +217,17 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if calendar_target:
             msg += f"\n🗓 Calendar: {target_cal.get('name')}"
         await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Error creating event: {e.response.text}")
+        try:
+            data = e.response.json()
+            api_msg = data.get("error") or data.get("message") or e.response.text
+        except Exception:
+            api_msg = e.response.text
+
+        msg = await get_text("add_err_api", user_id, error=api_msg)
+        docs = await get_text("add_docs", user_id)
+        await update.message.reply_text(msg + docs, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Error creating event: {e}")
         msg = await get_text("add_failed", user_id)

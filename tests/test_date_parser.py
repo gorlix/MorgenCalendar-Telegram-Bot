@@ -44,6 +44,29 @@ def test_parse_date_next_weekday_future():
     result_it = parse_date("venerdì", current_date=mock_now, lang="it")
     assert result_it == "2026-03-13"
 
+    # Test unaccented
+    result_it_unaccented = parse_date("venerdi", current_date=mock_now, lang="it")
+    assert result_it_unaccented == "2026-03-13"
+
+
+def test_parse_date_cross_language_independence():
+    # We test that regardless of lang parameter, native names are supported.
+    mock_now = datetime(2026, 3, 11, 14, 0, 0)
+
+    # Lang = en, Input = italian
+    result_italian_on_en = parse_date("lunedì", current_date=mock_now, lang="en")
+    assert result_italian_on_en == "2026-03-16"
+
+    # Lang = en, Input = unaccented italian
+    result_unaccented_italian_on_en = parse_date(
+        "lunedi", current_date=mock_now, lang="en"
+    )
+    assert result_unaccented_italian_on_en == "2026-03-16"
+
+    # Lang = it, Input = english
+    result_english_on_it = parse_date("monday", current_date=mock_now, lang="it")
+    assert result_english_on_it == "2026-03-16"
+
 
 def test_parse_date_next_weekday_past():
     # March 11 2026 is a Wednesday (2)
