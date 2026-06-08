@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch: # Permette l'avvio manuale dalla scheda Actions
 
+# Permessi minimi di default per tutti i job; il job deploy li sovrascrive
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
